@@ -92,11 +92,25 @@ db.exec(`
   );
 `);
 
-// Safe column migrations in case tables existed previously
+try {
+  const projectCols = db.prepare(`PRAGMA table_info(projects)`).all().map(c => c.name);
+  if (!projectCols.includes('gdrive_folder_url')) {
+    db.exec(`ALTER TABLE projects ADD COLUMN gdrive_folder_url TEXT DEFAULT ''`);
+  }
+  if (!projectCols.includes('gdrive_auto_sync')) {
+    db.exec(`ALTER TABLE projects ADD COLUMN gdrive_auto_sync INTEGER DEFAULT 1`);
+  }
+} catch (e) {
+  console.log('Migration notice (projects):', e.message);
+}
+
 try {
   const videoCols = db.prepare(`PRAGMA table_info(videos)`).all().map(c => c.name);
   if (!videoCols.includes('project_id')) {
     db.exec(`ALTER TABLE videos ADD COLUMN project_id INTEGER DEFAULT 1 REFERENCES projects(id) ON DELETE CASCADE`);
+  }
+  if (!videoCols.includes('gdrive_file_id')) {
+    db.exec(`ALTER TABLE videos ADD COLUMN gdrive_file_id TEXT DEFAULT ''`);
   }
 } catch (e) {
   console.log('Migration notice (videos):', e.message);

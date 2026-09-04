@@ -4,10 +4,11 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import db, { getSettings, addLog } from './db.js';
-import { processVideo } from './processor.js';
+import { processVideo, getVideoMetadata } from './processor.js';
 import { generateSeo } from './seo.js';
 import { publishToYouTube } from './publishers/youtube.js';
 import { publishToFacebook } from './publishers/facebook.js';
+import { parseDriveLink, extractFilesFromFolder, downloadDriveVideo } from './gdrive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,6 +82,79 @@ export const getNextScheduledRun = (projectId = null) => {
 };
 
 /**
+ * Automatically fetches the next unposted video from the project's connected Google Drive folder
+ */
+export const fetchNextVideoFromDrive = async (project) => {
+  if (!project || !project.gdrive_folder_url) return null;
+
+  try {
+    const parsed = parseDriveLink(project.gdrive_folder_url);
+    if (!parsed || parsed.type !== 'folder') {
+      addLog('warn', `কানেক্টেড Google Drive লিংকটি সঠিক ফোল্ডার লিঙ্ক নয়`, project.gdrive_folder_url, project.id);
+      return null;
+    }
+
+    addLog('info', `কানেক্টেড Google Drive ফোল্ডার স্ক্যান করা হচ্ছে... (ID: ${parsed.id})`, '', project.id);
+    const files = await extractFilesFromFolder(parsed.id);
+    if (!files || files.length === 0) {
+      addLog('warn', `কানেক্টেড Google Drive ফোল্ডারে কোনো ভিডিও পাওয়া যায়নি`, '', project.id);
+      return null;
+    }
+
+    // Get list of all file IDs or original names already recorded for this project
+    const existingVideos = db.prepare(`SELECT gdrive_file_id, original_name FROM videos WHERE project_id = ?`).all(project.id);
+    const existingIds = new Set(existingVideos.map(v => v.gdrive_file_id).filter(Boolean));
+    const existingNames = new Set(existingVideos.map(v => v.original_name).filter(Boolean));
+
+    // Find first file not yet posted or queued
+    const nextFile = files.find(f => !existingIds.has(f.id) && !existingNames.has(f.name));
+
+    if (!nextFile) {
+      addLog('warn', `Google Drive ফোল্ডারের সব ভিডিও (${files.length}টি) ইতিমধ্যে পোস্ট করা হয়ে গেছে! নতুন ভিডিও ফোল্ডারে যুক্ত করুন।`, '', project.id);
+      return null;
+    }
+
+    addLog('info', `Google Drive থেকে পরবর্তী নতুন ভিডিও পাওয়া গেছে: "${nextFile.name}"। ডাউনলোড শুরু হচ্ছে...`, '', project.id);
+
+    const queueDir = path.resolve(__dirname, '../uploads/queue');
+    if (!fs.existsSync(queueDir)) fs.mkdirSync(queueDir, { recursive: true });
+
+    const filename = `${Date.now()}_gdrive_${nextFile.id}.mp4`;
+    const targetPath = path.join(queueDir, filename);
+
+    await downloadDriveVideo(nextFile.id, targetPath);
+
+    const meta = await getVideoMetadata(targetPath);
+    const stats = fs.statSync(targetPath);
+    const originalName = nextFile.name || `GDrive_${nextFile.id.slice(0, 8)}.mp4`;
+
+    const maxOrderRow = db.prepare(`SELECT MAX(priority_order) as max_order FROM videos WHERE project_id = ? AND status = 'pending'`).get(project.id);
+    const currentOrder = (maxOrderRow?.max_order || 0) + 1;
+
+    const result = db.prepare(`
+      INSERT INTO videos (project_id, filename, original_name, file_path, file_size, duration, status, priority_order, gdrive_file_id)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+    `).run(
+      project.id,
+      filename,
+      originalName,
+      targetPath,
+      stats.size,
+      meta.duration,
+      currentOrder,
+      nextFile.id
+    );
+
+    addLog('success', `Google Drive থেকে "${originalName}" সফলভাবে স্টকে জমা হয়েছে এবং পাবলিশের জন্য প্রস্তুত!`, '', project.id);
+
+    return db.prepare(`SELECT * FROM videos WHERE id = ?`).get(result.lastInsertRowid);
+  } catch (err) {
+    addLog('error', `Google Drive অটো-সিঙ্ক ব্যর্থ: ${err.message}`, '', project.id);
+    return null;
+  }
+};
+
+/**
  * Core Automation Pipeline for a Project Video
  */
 export const executeVideoPublish = async ({ videoId = null, projectId = null, triggerSource = 'scheduler' } = {}) => {
@@ -108,9 +182,18 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
         .get();
     }
 
+    // If no video in local stock, check if project has connected Google Drive folder for auto-sync!
+    if (!video && projectId) {
+      const proj = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(projectId);
+      if (proj && proj.gdrive_folder_url && proj.gdrive_auto_sync === 1) {
+        addLog('info', `স্টক খালি থাকায় অটো-সিঙ্ক ড্রাইভ ফোল্ডার থেকে নতুন ভিডিও আনা হচ্ছে...`, proj.gdrive_folder_url, projectId);
+        video = await fetchNextVideoFromDrive(proj);
+      }
+    }
+
     if (!video) {
-      addLog('warn', `Schedule slot triggered (${triggerSource}), but no pending video found in stock!`, '', projectId);
-      return { success: false, message: 'No pending videos in stock queue' };
+      addLog('warn', `Schedule slot triggered (${triggerSource}), but no pending video found in stock or Google Drive!`, '', projectId);
+      return { success: false, message: 'No pending videos in stock queue or Google Drive' };
     }
 
     // Load project configuration

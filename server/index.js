@@ -8,7 +8,7 @@ import { DateTime } from 'luxon';
 import db, { getSettings, updateSettings, addLog, getLogs, clearLogs } from './db.js';
 import { getVideoMetadata, processVideo } from './processor.js';
 import { generateSeo } from './seo.js';
-import { startScheduler, getNextScheduledRun, executeVideoPublish } from './scheduler.js';
+import { startScheduler, getNextScheduledRun, executeVideoPublish, fetchNextVideoFromDrive } from './scheduler.js';
 import { parseDriveLink, downloadDriveVideo, extractFilesFromFolder } from './gdrive.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -208,7 +208,9 @@ app.put('/api/projects/:id', (req, res) => {
         watermark_scale = COALESCE(?, watermark_scale),
         watermark_opacity = COALESCE(?, watermark_opacity),
         sound_normalize_enabled = COALESCE(?, sound_normalize_enabled),
-        sound_tweak_pitch_tempo = COALESCE(?, sound_tweak_pitch_tempo)
+        sound_tweak_pitch_tempo = COALESCE(?, sound_tweak_pitch_tempo),
+        gdrive_folder_url = COALESCE(?, gdrive_folder_url),
+        gdrive_auto_sync = COALESCE(?, gdrive_auto_sync)
       WHERE id = ?
     `).run(
       p.name, p.description, p.niche, p.content_language, p.default_hashtags,
@@ -217,11 +219,34 @@ app.put('/api/projects/:id', (req, res) => {
       p.facebook_access_token, p.facebook_page_id,
       p.watermark_enabled, p.watermark_position, p.watermark_scale, p.watermark_opacity,
       p.sound_normalize_enabled, p.sound_tweak_pitch_tempo,
+      p.gdrive_folder_url, p.gdrive_auto_sync,
       req.params.id
     );
 
     addLog('info', `Updated settings for project "${p.name || existing.name}"`, '', req.params.id);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Sync Next Video from Google Drive On-Demand
+app.post('/api/projects/:id/sync-drive-next', async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const project = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(projectId);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    if (!project.gdrive_folder_url) {
+      return res.status(400).json({ error: 'এই চ্যানেলে কোনো Google Drive ফোল্ডার লিঙ্ক কানেক্ট করা নেই' });
+    }
+
+    const video = await fetchNextVideoFromDrive(project);
+    if (!video) {
+      return res.status(404).json({ error: 'ড্রাইভ ফোল্ডারে আর কোনো নতুন বা অপ্রকাশিত ভিডিও পাওয়া যায়নি' });
+    }
+
+    res.json({ success: true, video });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

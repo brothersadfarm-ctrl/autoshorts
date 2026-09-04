@@ -171,6 +171,24 @@ async function switchProject(projectId) {
     console.error('Failed to load settings:', e);
   }
 
+  // Google Drive Permanent Connection
+  const gdriveInput = document.getElementById('project-gdrive-folder');
+  const gdriveAutoSync = document.getElementById('project-gdrive-autosync');
+  const gdriveBadge = document.getElementById('gdrive-status-badge');
+
+  if (gdriveInput) gdriveInput.value = currentProject.gdrive_folder_url || '';
+  if (gdriveAutoSync) gdriveAutoSync.checked = currentProject.gdrive_auto_sync !== 0;
+
+  if (gdriveBadge) {
+    if (currentProject.gdrive_folder_url) {
+      gdriveBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5';
+      gdriveBadge.innerHTML = '<i class="fa-solid fa-circle text-[6px] text-emerald-400 animate-pulse"></i><span id="gdrive-status-text">সংযুক্ত (২৪/৭ অটো-পোস্ট সক্রিয়)</span>';
+    } else {
+      gdriveBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1.5';
+      gdriveBadge.innerHTML = '<i class="fa-solid fa-circle text-[6px]"></i><span id="gdrive-status-text">কানেক্টেড নয়</span>';
+    }
+  }
+
   // Load this project's videos & schedules
   loadCurrentProjectVideos();
   loadCurrentProjectSchedules();
@@ -1136,57 +1154,94 @@ async function clearActivityLogs() {
   }
 }
 
-// ======================== GOOGLE DRIVE VIDEO IMPORT ========================
-async function handleImportGoogleDrive() {
+// ======================== GOOGLE DRIVE PERMANENT AUTO-SYNC ========================
+async function saveDriveFolderConnection() {
   if (!currentProjectId) {
     showToast('দয়া করে প্রথমে একটি চ্যানেল প্রজেক্ট সিলেক্ট করুন!', 'warn');
     return;
   }
 
-  const input = document.getElementById('gdrive-links-input');
-  const rawText = input.value.trim();
-  if (!rawText) {
-    showToast('দয়া করে অন্তত একটি Google Drive ভিডিও লিঙ্ক দিন', 'warn');
-    return;
-  }
+  const folderInput = document.getElementById('project-gdrive-folder');
+  const folderUrl = folderInput.value.trim();
+  const autoSyncChecked = document.getElementById('project-gdrive-autosync').checked ? 1 : 0;
 
-  const btn = document.getElementById('btn-import-gdrive');
+  const btn = document.getElementById('btn-save-gdrive-folder');
   btn.disabled = true;
-  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Google Drive লিংক চেক হচ্ছে...`;
-
-  showToast('Google Drive ফোল্ডার স্ক্যান করা হচ্ছে...', 'info');
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>কানেক্ট করা হচ্ছে...`;
 
   try {
-    const res = await fetch(`/api/projects/${currentProjectId}/videos/import-gdrive`, {
-      method: 'POST',
+    const res = await fetch(`/api/projects/${currentProjectId}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ links: rawText })
+      body: JSON.stringify({
+        gdrive_folder_url: folderUrl,
+        gdrive_auto_sync: autoSyncChecked
+      })
     });
 
     const data = await res.json();
     if (data.success) {
-      showToast(`অভিনন্দন! ${data.message || 'ভিডিও স্টকে যুক্ত হচ্ছে'}`, 'success');
-      input.value = '';
-      loadCurrentProjectVideos();
-      loadStatus();
-
-      // Poll queue every 3 seconds for 2 minutes to show incoming videos as they download
-      let pollCount = 0;
-      const pollTimer = setInterval(() => {
-        loadCurrentProjectVideos();
-        loadStatus();
-        pollCount++;
-        if (pollCount > 40) clearInterval(pollTimer);
-      }, 3000);
+      if (folderUrl) {
+        showToast('অভিনন্দন! Google Drive ফোল্ডার সফলভাবে এই চ্যানেলে কানেক্ট হয়েছে! এখন ড্রাইভে ভিডিও রাখলেই নির্দিষ্ট সময়ে স্বয়ংক্রিয়ভাবে পাবলিশ হবে।', 'success');
+      } else {
+        showToast('Google Drive ফোল্ডার ডিসকানেক্ট করা হয়েছে', 'info');
+      }
+      await loadProjects();
+      switchProject(currentProjectId);
     } else {
-      const errMsg = data.errors && data.errors.length > 0 ? data.errors[0].error : (data.error || 'ইম্পোর্ট করা যায়নি');
-      showToast(`ত্রুটি: ${errMsg}`, 'error');
+      showToast(data.error || 'সংরক্ষণ ব্যর্থ', 'error');
     }
   } catch (err) {
-    showToast(`ডাউনলোড ত্রুটি: ${err.message}`, 'error');
+    showToast('ত্রুটি: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = `<i class="fa-brands fa-google-drive"></i><span>Google Drive থেকে স্টকে যুক্ত করুন</span>`;
+    btn.innerHTML = `<i class="fa-solid fa-link"></i><span>ফোল্ডার সেভ ও কানেক্ট করুন</span>`;
+  }
+}
+
+async function toggleDriveAutoSync(checked) {
+  if (!currentProjectId) return;
+  try {
+    await fetch(`/api/projects/${currentProjectId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gdrive_auto_sync: checked ? 1 : 0 })
+    });
+    showToast(checked ? '২৪/৭ ক্লাউড অটো-পোস্টিং চালু করা হয়েছে' : 'ক্লাউড অটো-পোস্টিং সাময়িক বন্ধ রাখা হয়েছে', 'info');
+  } catch (e) {
+    console.error('Auto sync toggle error:', e);
+  }
+}
+
+async function syncNextVideoFromDrive() {
+  if (!currentProjectId) {
+    showToast('দয়া করে প্রথমে একটি চ্যানেল প্রজেক্ট নির্বাচন করুন', 'warn');
+    return;
+  }
+
+  const btn = document.getElementById('btn-sync-next');
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5 text-amber-400"></i><span>ড্রাইভ চেক করা হচ্ছে...</span>`;
+
+  try {
+    showToast('কানেক্টেড Google Drive ফোল্ডার থেকে নতুন ভিডিও খোঁজা হচ্ছে...', 'info');
+    const res = await fetch(`/api/projects/${currentProjectId}/sync-drive-next`, {
+      method: 'POST'
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast(`সফল! ড্রাইভ থেকে নতুন ভিডিও ("${data.video.original_name}") স্টকে ডাউনলোড ও পোস্টের জন্য প্রস্তুত!`, 'success');
+      loadCurrentProjectVideos();
+      loadStatus();
+    } else {
+      showToast(data.error || 'নতুন ভিডিও পাওয়া যায়নি', 'warn');
+    }
+  } catch (err) {
+    showToast('সিঙ্ক ত্রুটি: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down text-amber-400"></i><span>ড্রাইভ থেকে পরবর্তী ১টি ভিডিও আনুন</span>`;
   }
 }
 
