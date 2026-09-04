@@ -368,68 +368,79 @@ app.post('/api/projects/:id/videos/import-gdrive', async (req, res) => {
       if (parsed.type === 'folder') {
         try {
           addLog('info', `Google Drive ফোল্ডার থেকে ফাইল খোঁজা হচ্ছে... (ID: ${parsed.id})`, link, projectId);
-          const folderFileIds = await extractFilesFromFolder(parsed.id);
-          if (folderFileIds.length === 0) {
+          const folderFiles = await extractFilesFromFolder(parsed.id);
+          if (folderFiles.length === 0) {
             errors.push({ link, error: 'ফোল্ডারে কোনো ভিডিও ফাইল পাওয়া যায়নি অথবা ফোল্ডারটি পাবলিক নয়' });
           } else {
-            addLog('info', `Google Drive ফোল্ডারে ${folderFileIds.length}টি ফাইল পাওয়া গেছে!`, '', projectId);
-            for (const fId of folderFileIds) {
-              fileItems.push({ id: fId, link: `https://drive.google.com/file/d/${fId}/view` });
+            addLog('info', `Google Drive ফোল্ডারে ${folderFiles.length}টি ভিডিও পাওয়া গেছে!`, '', projectId);
+            for (const f of folderFiles) {
+              fileItems.push({ id: f.id, name: f.name, link: `https://drive.google.com/file/d/${f.id}/view` });
             }
           }
         } catch (fErr) {
           errors.push({ link, error: `ফোল্ডার রিড করতে ব্যর্থ: ${fErr.message}` });
         }
       } else {
-        fileItems.push({ id: parsed.id, link });
+        fileItems.push({ id: parsed.id, name: `GDrive_${parsed.id.slice(0, 8)}.mp4`, link });
       }
     }
 
-    for (const item of fileItems) {
-      const filename = `${Date.now()}_gdrive_${item.id}.mp4`;
-      const targetPath = path.join(queueDir, filename);
-
-      try {
-        addLog('info', `Google Drive থেকে ভিডিও ডাউনলোড হচ্ছে...`, `Link: ${item.link}`, projectId);
-        await downloadDriveVideo(item.id, targetPath);
-
-        const meta = await getVideoMetadata(targetPath);
-        const stats = fs.statSync(targetPath);
-        const originalName = `GDrive_${parsed.id.slice(0, 8)}.mp4`;
-
-        const result = insertStmt.run(
-          projectId,
-          filename,
-          originalName,
-          targetPath,
-          stats.size,
-          meta.duration,
-          currentOrder++
-        );
-
-        inserted.push({
-          id: result.lastInsertRowid,
-          originalName,
-          duration: meta.duration,
-          size: stats.size
-        });
-
-        addLog('success', `Google Drive থেকে ভিডিও সফলভাবে স্টকে জমা হয়েছে! (${originalName})`, '', projectId);
-      } catch (dlErr) {
-        if (fs.existsSync(targetPath)) {
-          try { fs.unlinkSync(targetPath); } catch (e) {}
-        }
-        errors.push({ link, error: dlErr.message });
-        addLog('error', `Google Drive ডাউনলোড ব্যর্থ: ${dlErr.message}`, link, projectId);
-      }
+    if (fileItems.length === 0) {
+      const errMsg = errors[0]?.error || 'কোনো ভিডিও ফাইল পাওয়া যায়নি';
+      return res.status(400).json({ success: false, error: errMsg, errors });
     }
 
+    // Respond immediately so user UI doesn't freeze or timeout
     res.json({
-      success: inserted.length > 0,
-      importedCount: inserted.length,
-      imported: inserted,
-      errors
+      success: true,
+      totalDetected: fileItems.length,
+      message: `${fileItems.length}টি ভিডিও পাওয়া গেছে! ব্যাকগ্রাউন্ডে স্টকে এক এক করে জমা হচ্ছে...`
     });
+
+    // Background download processing
+    (async () => {
+      const maxOrderRow = db.prepare(`SELECT MAX(priority_order) as max_order FROM videos WHERE project_id = ? AND status = 'pending'`).get(projectId);
+      let currentOrder = (maxOrderRow?.max_order || 0) + 1;
+
+      const insertStmt = db.prepare(`
+        INSERT INTO videos (project_id, filename, original_name, file_path, file_size, duration, status, priority_order)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+      `);
+
+      for (const item of fileItems) {
+        const filename = `${Date.now()}_gdrive_${item.id}.mp4`;
+        const targetPath = path.join(queueDir, filename);
+
+        try {
+          addLog('info', `Google Drive থেকে ডাউনলোড হচ্ছে: ${item.name || item.id}`, `Link: ${item.link}`, projectId);
+          await downloadDriveVideo(item.id, targetPath);
+
+          const meta = await getVideoMetadata(targetPath);
+          const stats = fs.statSync(targetPath);
+          const originalName = item.name || `GDrive_${item.id.slice(0, 8)}.mp4`;
+
+          insertStmt.run(
+            projectId,
+            filename,
+            originalName,
+            targetPath,
+            stats.size,
+            meta.duration,
+            currentOrder++
+          );
+
+          addLog('success', `Google Drive থেকে ভিডিও সফলভাবে স্টকে জমা হয়েছে! (${originalName})`, '', projectId);
+        } catch (dlErr) {
+          if (fs.existsSync(targetPath)) {
+            try { fs.unlinkSync(targetPath); } catch (e) {}
+          }
+          addLog('error', `Google Drive ডাউনলোড ব্যর্থ (${item.name || item.id}): ${dlErr.message}`, item.link, projectId);
+        }
+      }
+    })().catch(bgErr => {
+      console.error('Background gdrive download error:', bgErr);
+    });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

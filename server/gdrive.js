@@ -33,7 +33,7 @@ export function parseDriveLink(link) {
 }
 
 /**
- * Extracts file IDs from a public Google Drive folder page
+ * Extracts video files (IDs and names) from a public Google Drive folder page
  */
 export async function extractFilesFromFolder(folderId) {
   const url = `https://drive.google.com/drive/folders/${folderId}`;
@@ -44,21 +44,70 @@ export async function extractFilesFromFolder(folderId) {
   });
 
   const html = res.data;
-  const sskMatches = [...html.matchAll(/ssk='5:auSv138:([a-zA-Z0-9_-]{25,45})/g)].map(m => m[1]);
-  return Array.from(new Set(sskMatches));
+  const items = [];
+  const seen = new Set();
+
+  // Pattern 1: JSON-like unescaped or escaped with \x22
+  // Format: "FILE_ID\x22,\x5b\x22FOLDER_ID\x22\x5d,\x22FILE_NAME.mp4\x22,\x22video\/mp4\x22"
+  const unescaped = html.replace(/\\x22/g, '"').replace(/\\x5b/g, '[').replace(/\\x5d/g, ']');
+  const reg = /"([a-zA-Z0-9_-]{25,45})",\["[a-zA-Z0-9_-]+"\],"([^"]+\.(?:mp4|mov|mkv|webm|avi|m4v))"/gi;
+  let match;
+  while ((match = reg.exec(unescaped)) !== null) {
+    const id = match[1].replace(/-[0-9]+-[0-9]+$/, '').replace(/-0-\d+$/, '');
+    const name = match[2];
+    if (!seen.has(id)) {
+      seen.add(id);
+      items.push({ id, name });
+    }
+  }
+
+  // Fallback: match ssk entries if regex above matched nothing
+  if (items.length === 0) {
+    const sskMatches = [...html.matchAll(/ssk='5:auSv138:([a-zA-Z0-9_-]{25,45})/g)].map(m => m[1]);
+    for (const rawId of sskMatches) {
+      const cleanId = rawId.replace(/-[0-9]+-[0-9]+$/, '').replace(/-0-\d+$/, '');
+      if (!seen.has(cleanId)) {
+        seen.add(cleanId);
+        items.push({ id: cleanId, name: `GDrive_${cleanId.slice(0, 8)}.mp4` });
+      }
+    }
+  }
+
+  return items;
 }
 
 /**
  * Downloads a public Google Drive video file by ID
  */
 export async function downloadDriveVideo(fileId, targetPath) {
-  const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+  // Strip any unexpected suffixes
+  const cleanId = String(fileId).replace(/-[0-9]+-[0-9]+$/, '').replace(/-0-\d+$/, '').trim();
 
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
   };
 
-  const initialRes = await axios.get(directUrl, {
+  // Try direct usercontent download first
+  try {
+    const directUrl = `https://drive.usercontent.google.com/download?id=${cleanId}&export=download&confirm=t`;
+    const res = await axios.get(directUrl, {
+      responseType: 'stream',
+      headers,
+      validateStatus: (status) => status >= 200 && status < 300
+    });
+
+    const contentType = res.headers['content-type'] || '';
+    if (!contentType.includes('text/html')) {
+      await pipeStreamToFile(res.data, targetPath);
+      return true;
+    }
+  } catch (err) {
+    // Fall back to uc?export=download flow
+  }
+
+  // Fallback: standard uc?export=download flow
+  const ucUrl = `https://drive.google.com/uc?export=download&id=${cleanId}`;
+  const initialRes = await axios.get(ucUrl, {
     responseType: 'stream',
     maxRedirects: 5,
     validateStatus: (status) => status >= 200 && status < 400,
@@ -81,7 +130,7 @@ export async function downloadDriveVideo(fileId, targetPath) {
 
     if (confirmMatch) {
       const confirmToken = confirmMatch[1];
-      const confirmUrl = `https://drive.google.com/uc?export=download&confirm=${confirmToken}&id=${fileId}`;
+      const confirmUrl = `https://drive.google.com/uc?export=download&confirm=${confirmToken}&id=${cleanId}`;
       const cookies = initialRes.headers['set-cookie'] ? initialRes.headers['set-cookie'].join('; ') : '';
 
       const streamRes = await axios.get(confirmUrl, {
@@ -96,7 +145,6 @@ export async function downloadDriveVideo(fileId, targetPath) {
       await pipeStreamToFile(streamRes.data, targetPath);
       return true;
     } else {
-      // Permission issue or not public
       throw new Error('Google Drive ফাইলটি পাবলিক নয়। ফাইলে Share -> "Anyone with the link can view" নিশ্চিত করুন।');
     }
   } else {

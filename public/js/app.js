@@ -1032,9 +1032,9 @@ async function handleImportGoogleDrive() {
 
   const btn = document.getElementById('btn-import-gdrive');
   btn.disabled = true;
-  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Google Drive থেকে ডাউনলোড হচ্ছে...`;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Google Drive লিংক চেক হচ্ছে...`;
 
-  showToast('Google Drive থেকে ভিডিও ডাউনলোড ও স্টকে যুক্ত করা শুরু হয়েছে...', 'info');
+  showToast('Google Drive ফোল্ডার স্ক্যান করা হচ্ছে...', 'info');
 
   try {
     const res = await fetch(`/api/projects/${currentProjectId}/videos/import-gdrive`, {
@@ -1045,10 +1045,19 @@ async function handleImportGoogleDrive() {
 
     const data = await res.json();
     if (data.success) {
-      showToast(`অভিনন্দন! Google Drive থেকে ${data.importedCount}টি ভিডিও স্টকে যুক্ত হয়েছে!`, 'success');
+      showToast(`অভিনন্দন! ${data.message || 'ভিডিও স্টকে যুক্ত হচ্ছে'}`, 'success');
       input.value = '';
       loadCurrentProjectVideos();
       loadStatus();
+
+      // Poll queue every 3 seconds for 2 minutes to show incoming videos as they download
+      let pollCount = 0;
+      const pollTimer = setInterval(() => {
+        loadCurrentProjectVideos();
+        loadStatus();
+        pollCount++;
+        if (pollCount > 40) clearInterval(pollTimer);
+      }, 3000);
     } else {
       const errMsg = data.errors && data.errors.length > 0 ? data.errors[0].error : (data.error || 'ইম্পোর্ট করা যায়নি');
       showToast(`ত্রুটি: ${errMsg}`, 'error');
