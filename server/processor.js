@@ -172,11 +172,14 @@ export const processVideo = async (inputPath, outputPath, options = {}) => {
       args.push('-c:a', 'aac', '-b:a', '192k');
     }
 
-    // Video codec & output flags
+    // Video codec & output flags (optimized for low memory / cloud environments)
     args.push(
+      '-threads', '2',
       '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '22',
+      '-preset', 'veryfast',
+      '-crf', '24',
+      '-bufsize', '2000k',
+      '-maxrate', '3500k',
       '-pix_fmt', 'yuv420p',
       '-movflags', '+faststart',
       outputPath

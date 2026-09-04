@@ -119,8 +119,11 @@ export async function downloadDriveVideo(fileId, targetPath) {
   // If Google returned HTML (virus warning / confirm page for larger files)
   if (contentType.includes('text/html')) {
     const chunks = [];
+    let readBytes = 0;
     for await (const chunk of initialRes.data) {
       chunks.push(chunk);
+      readBytes += chunk.length;
+      if (readBytes > 128 * 1024) break; // 128 KB is plenty for Google confirm page
     }
     const html = Buffer.concat(chunks).toString('utf-8');
 

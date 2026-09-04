@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node server/index.js",
+    "start": "node --max-old-space-size=256 server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node server/test_pipeline.js"
   },
