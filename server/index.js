@@ -648,6 +648,33 @@ app.delete('/api/projects/:id/schedules/:schedId', (req, res) => {
   res.json({ success: true });
 });
 
+// 4b. Apply Schedule Preset (e.g. 4-slots BD + USA target)
+app.post('/api/projects/:id/schedules/preset', (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const { slots } = req.body;
+  if (!slots || !Array.isArray(slots) || slots.length === 0) {
+    return res.status(400).json({ error: 'Slots array is required' });
+  }
+
+  try {
+    const deleteExisting = db.prepare(`DELETE FROM schedules WHERE project_id = ?`);
+    const insert = db.prepare(`INSERT INTO schedules (project_id, time_slot, is_enabled, label) VALUES (?, ?, 1, ?)`);
+
+    const runBatch = db.transaction(() => {
+      deleteExisting.run(projectId);
+      for (const s of slots) {
+        insert.run(projectId, s.time_slot, s.label || `${s.time_slot} Slot`);
+      }
+    });
+
+    runBatch();
+    addLog('success', `Applied ${slots.length}-slot schedule preset for project`, '', projectId);
+    res.json({ success: true, message: 'Preset applied successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 5. Global Settings
 app.get('/api/settings', (req, res) => {
   res.json(getSettings());

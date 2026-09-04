@@ -635,6 +635,36 @@ async function loadCurrentProjectSchedules() {
   }
 }
 
+async function applyBdUsaPreset() {
+  if (!currentProjectId) return;
+  if (!confirm(`আপনি কি "${currentProject.name}" চ্যানেলে বাংলাদেশ ও USA টার্গেট করে দৈনিক ৪টি ভাইরাল সময় (০৯:০০, ১৪:০০, ১৯:০০, ২৩:০০) সেট করতে চান?`)) return;
+
+  const slots = [
+    { time_slot: '09:00', label: 'সকাল ০৯:০০ (BD Morning & US West Night)' },
+    { time_slot: '14:00', label: 'দুপুর ০২:০০ (BD Lunch & Afternoon Break)' },
+    { time_slot: '19:00', label: 'সন্ধ্যা ০৭:০০ (BD Evening & US East Morning)' },
+    { time_slot: '23:00', label: 'রাত ১১:০০ (BD Bedtime & US Midday Lunch)' }
+  ];
+
+  try {
+    const res = await fetch(`/api/projects/${currentProjectId}/schedules/preset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slots })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('বাংলাদেশ ও USA-এর ৪টি ভাইরাল সময়সূচি সফলভাবে সেট হয়েছে! 🇧🇩 🇺🇸', 'success');
+      loadCurrentProjectSchedules();
+      loadStatus();
+    } else {
+      showToast(data.error || 'সেট করা যায়নি', 'error');
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
 async function handleAddScheduleSlot() {
   const time = document.getElementById('new-slot-input').value;
   const label = document.getElementById('new-slot-label-input').value;
