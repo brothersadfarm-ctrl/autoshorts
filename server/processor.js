@@ -153,7 +153,16 @@ export const processVideo = async (inputPath, outputPath, options = {}) => {
       const targetWidth = Math.round((meta.width || 1080) * scalePercent);
 
       // Natural, clean alpha overlay without touching video color planes (prevents color shifts/green tints)
-      const opacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : (parseFloat(watermarkOpacity) || 0.85);
+      let opacity = 0.15;
+      if (typeof watermarkOpacity === 'number') {
+        opacity = watermarkOpacity > 1 ? watermarkOpacity / 100 : watermarkOpacity;
+      } else if (typeof watermarkOpacity === 'string') {
+        const parsed = parseFloat(watermarkOpacity.replace('%', ''));
+        if (!isNaN(parsed)) {
+          opacity = parsed > 1 ? parsed / 100 : parsed;
+        }
+      }
+      opacity = Math.max(0.05, Math.min(1.0, opacity));
 
       filterComplexParts.push(
         `[1:v]scale=${targetWidth}:-1,format=rgba,colorchannelmixer=aa=${opacity}[wm]`
