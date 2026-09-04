@@ -1,9 +1,12 @@
 # AutoShorts 24/7 Production Dockerfile
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
-# Install FFmpeg and required media libraries
+# Install FFmpeg and build tools for native addons
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    python3 \
+    make \
+    g++ \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -14,7 +17,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production dependencies
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # Copy source code and assets
 COPY . .
