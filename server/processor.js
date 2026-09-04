@@ -137,14 +137,14 @@ export const processVideo = async (inputPath, outputPath, options = {}) => {
         case 'floating':
         case 'floating-smooth':
         default:
-          // Smooth slow floating movement around all 4 sides of the video (anti-theft perimeter motion)
-          overlayX = '(main_w-overlay_w)/2+((main_w-overlay_w)*0.40)*sin(t*0.35)';
-          overlayY = '(main_h-overlay_h)/2+((main_h-overlay_h)*0.42)*cos(t*0.25)';
+          // Ultra-smooth, gentle slow floating movement (halved speed as requested)
+          overlayX = '(main_w-overlay_w)/2+((main_w-overlay_w)*0.40)*sin(t*0.175)';
+          overlayY = '(main_h-overlay_h)/2+((main_h-overlay_h)*0.42)*cos(t*0.125)';
           break;
         case 'floating-corners':
-          // Slow drifting between 4 corners
-          overlayX = '(main_w-overlay_w)/2+((main_w-overlay_w)*0.42)*sin(t*0.14)';
-          overlayY = '(main_h-overlay_h)/2+((main_h-overlay_h)*0.42)*cos(t*0.16)';
+          // Slow drifting between 4 corners (halved speed)
+          overlayX = '(main_w-overlay_w)/2+((main_w-overlay_w)*0.42)*sin(t*0.07)';
+          overlayY = '(main_h-overlay_h)/2+((main_h-overlay_h)*0.42)*cos(t*0.08)';
           break;
       }
 
