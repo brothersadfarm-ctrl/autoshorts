@@ -2,6 +2,14 @@ import axios from 'axios';
 import { addLog } from './db.js';
 
 /**
+ * Helper to guarantee no Bengali script appears in titles/descriptions/captions
+ */
+export const stripBangla = (text) => {
+  if (!text) return '';
+  return text.replace(/[\u0980-\u09FF]+/g, '').replace(/\s{2,}/g, ' ').trim();
+};
+
+/**
  * Generate SEO metadata (Title, Description, Tags, Hashtags)
  * using Google Gemini API with smart fallback
  */
@@ -9,8 +17,10 @@ export const generateSeo = async (videoInfo, settings) => {
   const { originalName, customNotes } = videoInfo;
   const apiKey = settings.gemini_api_key?.trim();
   const niche = settings.channel_niche || 'Viral Entertainment & Facts';
-  const language = settings.content_language || 'Bangla & English';
-  const defaultHashtags = settings.default_hashtags || '#Shorts #Reels #Viral #Trending';
+  const language = '100% English (Global / USA Audience - No Bengali)';
+  const defaultHashtags = (settings.default_hashtags || '#Shorts #Reels #Viral #Trending')
+    .replace(/#Bangla\b/gi, '')
+    .trim();
   const customPrompt = settings.seo_prompt_custom || '';
 
   // Clean filename for context
@@ -27,8 +37,13 @@ export const generateSeo = async (videoInfo, settings) => {
       const prompt = `
 You are an elite Social Media Strategist and viral growth hacker specializing in YouTube Shorts and Facebook Reels algorithms.
 
+STRICT LANGUAGE REQUIREMENT:
+- You MUST write 100% in ENGLISH ONLY.
+- DO NOT use ANY Bengali (বাংলা) characters, words, letters, or translations anywhere in titles, descriptions, captions, tags, or hashtags!
+- Everything must be written in natural, fluent, engaging English designed for US and Global viewers.
+
 TASK:
-Perform a deep content and audience analysis of the following short video, then generate TWO distinctly different, platform-optimized SEO profiles:
+Perform a deep content and audience analysis of the following short video, then generate TWO distinctly different, platform-optimized SEO profiles in 100% ENGLISH:
 1. One specifically engineered for YouTube Shorts algorithm & search SEO.
 2. One specifically engineered for Facebook Reels algorithm & social engagement / sharing.
 
@@ -36,40 +51,40 @@ VIDEO CONTEXT & DETAILS:
 - Video Topic / Raw Name: "${cleanName}"
 ${customNotes ? `- Creator Notes: "${customNotes}"` : ''}
 - Channel Niche: ${niche}
-- Target Audience & Language: ${language} (Bangladesh & International/USA viewers)
+- Language Requirement: 100% English Only (STRICT: NO BENGALI / BANGLA)
 ${customPrompt ? `- Additional Creator Guidance: "${customPrompt}"` : ''}
 
 ALGORITHM RULES & POLICIES:
-=== PLATFORM 1: YOUTUBE SHORTS ===
+=== PLATFORM 1: YOUTUBE SHORTS (100% ENGLISH) ===
 - Algorithm goal: High Click-Through Rate (CTR) on Shorts shelf + Long-tail YouTube Search ranking.
-- Title: Under 85 characters, irresistible curiosity loop or emotion, 1-2 emojis, MUST end with #Shorts.
-- Description: Structured YouTube SEO description:
-  1. Compelling 2-3 line hook summarizing the video in Bangla & English.
+- Title: Under 85 characters, irresistible English curiosity loop or emotion, 1-2 emojis, MUST end with #Shorts.
+- Description: Structured YouTube SEO description in English:
+  1. Compelling 2-3 line hook summarizing the video in clear English.
   2. Call to Action (CTA) to Subscribe & turn on notifications.
-  3. "Search Keywords / সম্পর্কিত অনুসন্ধান:" section containing 6-8 relevant search queries in English & Bangla.
+  3. "Search Keywords:" section containing 6-8 relevant English search queries.
   4. 3-5 YouTube hashtags (including #Shorts, #YouTubeShorts).
-- Tags: 12-15 specific keyword phrases for backend search ranking (English & Bangla).
+- Tags: 12-15 specific keyword phrases for backend search ranking (English only).
 
-=== PLATFORM 2: FACEBOOK REELS ===
+=== PLATFORM 2: FACEBOOK REELS (100% ENGLISH) ===
 - Algorithm goal: Immediate scroll-stop within 1.5 seconds + Maximum Shares & Comments (Meta rewards comment threads & user shares heavily).
 - Strict Policy: NEVER include "#Shorts", "#youtubeshorts", or YouTube links! Meta algorithm penalizes competitor branding.
 - Caption (Facebook Reels only has a Caption, not a separate title):
-  1. Hook Line (Above the fold): Catchy, emotional question or relatable statement in Bangla & English with emojis.
-  2. Relatable Body: 1-2 short sentences making the viewer smile, laugh, or feel emotional.
-  3. Viral Engagement Trigger: Ask viewers an engaging question or tell them to tag a friend / share (e.g. "আপনারও কি এমন কিউট বিড়াল আছে? কমেন্টে জানান! 🐾 Share with a cat lover! 👇").
+  1. Hook Line (Above the fold): Catchy, emotional question or relatable statement in English with emojis.
+  2. Relatable Body: 1-2 short sentences in English making the viewer smile, laugh, or feel amazed.
+  3. Viral Engagement Trigger: Ask viewers an engaging question or tell them to tag a friend / share (e.g. "Have you ever seen something this adorable? Drop your thoughts below! 🐾 Share with a cat lover! 👇").
   4. Facebook Hashtags: 4-6 targeted Facebook hashtags (e.g. #reels #reelsfb #facebookreels #viralreels #catlovers #reelsvideo).
 
 Respond ONLY with a valid JSON object matching this exact schema:
 {
-  "analysis": "1-2 sentence deep analysis of the visual/emotional hook and audience trigger",
+  "analysis": "1-2 sentence deep analysis of the visual/emotional hook and audience trigger in English",
   "youtube": {
-    "title": "Viral YouTube Shorts Title (max 85 chars, with emojis and #Shorts)",
-    "description": "Algorithmic YouTube description with keywords and subscribe CTA",
+    "title": "Viral YouTube Shorts Title in English (max 85 chars, with emojis and #Shorts)",
+    "description": "Algorithmic YouTube description in English with keywords and subscribe CTA",
     "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
     "hashtags": "#Shorts #YouTubeShorts #viral #trending"
   },
   "facebook": {
-    "caption": "Viral Facebook Reels caption with hook, engagement question/share CTA, and FB hashtags (NO #Shorts)",
+    "caption": "Viral Facebook Reels caption in English with hook, engagement question/share CTA, and FB hashtags (NO #Shorts)",
     "hashtags": "#reels #reelsfb #facebookreels #viralreels"
   }
 }
@@ -116,23 +131,26 @@ Respond ONLY with a valid JSON object matching this exact schema:
           const fbCaption = parsed.facebook?.caption || parsed.caption;
 
           if (ytTitle || fbCaption) {
-            const finalYtTitle = ytTitle || cleanName;
-            const finalYtDesc = parsed.youtube?.description || parsed.description || '';
-            const finalYtTags = Array.isArray(parsed.youtube?.tags) ? parsed.youtube.tags.join(', ') : (parsed.youtube?.tags || parsed.tags || 'shorts, reels, viral');
-            const finalYtHashtags = parsed.youtube?.hashtags || parsed.hashtags || defaultHashtags;
+            const finalYtTitle = stripBangla(ytTitle || cleanName);
+            const finalYtDesc = stripBangla(parsed.youtube?.description || parsed.description || '');
+            const rawTags = Array.isArray(parsed.youtube?.tags) ? parsed.youtube.tags.join(', ') : (parsed.youtube?.tags || parsed.tags || 'shorts, reels, viral');
+            const finalYtTags = stripBangla(rawTags);
+            const finalYtHashtags = stripBangla(parsed.youtube?.hashtags || parsed.hashtags || defaultHashtags);
             
-            // Clean facebook caption to strictly remove any accidental #Shorts
-            let finalFbCaption = fbCaption || `${finalYtTitle.replace(/#Shorts/gi, '').trim()}\n\n${finalYtDesc.replace(/#Shorts/gi, '').trim()}`;
-            finalFbCaption = finalFbCaption.replace(/#Shorts/gi, '').replace(/#youtubeshorts/gi, '').trim();
+            // Clean facebook caption to strictly remove any accidental #Shorts and strip any Bengali characters
+            let rawFbCaption = fbCaption || `${finalYtTitle.replace(/#Shorts/gi, '').trim()}\n\n${finalYtDesc.replace(/#Shorts/gi, '').trim()}`;
+            rawFbCaption = rawFbCaption.replace(/#Shorts/gi, '').replace(/#youtubeshorts/gi, '').trim();
+            const finalFbCaption = stripBangla(rawFbCaption);
+            const finalFbHashtags = stripBangla(parsed.facebook?.hashtags || '#reels #reelsfb #viralreels #facebookreels');
 
-            addLog('success', `Gemini AI generated dual-platform viral SEO: [YT] "${finalYtTitle}" | [FB] Hook: "${finalFbCaption.slice(0, 45)}..."`);
+            addLog('success', `Gemini AI generated dual-platform viral SEO (100% English): [YT] "${finalYtTitle}" | [FB] Hook: "${finalFbCaption.slice(0, 45)}..."`);
             return {
               title: finalYtTitle,
               description: finalYtDesc,
               tags: finalYtTags,
               hashtags: finalYtHashtags,
               facebookCaption: finalFbCaption,
-              analysis: parsed.analysis || 'Optimized for high YouTube CTR and Facebook viral social sharing.',
+              analysis: stripBangla(parsed.analysis) || 'Optimized for high YouTube CTR and Facebook viral social sharing (English only).',
               youtube: {
                 title: finalYtTitle,
                 description: finalYtDesc,
@@ -141,7 +159,7 @@ Respond ONLY with a valid JSON object matching this exact schema:
               },
               facebook: {
                 caption: finalFbCaption,
-                hashtags: parsed.facebook?.hashtags || '#reels #reelsfb #viralreels'
+                hashtags: finalFbHashtags
               },
               aiGenerated: true
             };
@@ -174,7 +192,7 @@ export const generateFallbackSeo = (cleanName, niche, defaultHashtags) => {
 
   const ytTitleTemplates = [
     `🔥 ${titleWords} | You Won't Believe This! #Shorts`,
-    `😱 ${titleWords} | Shocking Truth! #Shorts`,
+    `😱 ${titleWords} | Cutest Moment Ever! #Shorts`,
     `✨ ${titleWords} | Best Viral Moments #Shorts`,
     `🚀 ${titleWords} (Wait For The End!) #Shorts`
   ];
@@ -211,7 +229,7 @@ ${defaultHashtags} #Shorts #YouTubeShorts #Trending
 
   const fbCaption = `✨ ${titleWords.replace(/#Shorts/gi, '').trim()}!
 
-Wait for the cutest moment! 😻 এই মিষ্টি ভিডিওটি ভালো লাগলে বন্ধুদের সাথে শেয়ার করুন এবং কমেন্টে জানান কেমন লাগলো! 👇
+Wait for the cutest moment! 😻 If this made you smile, share it with your friends and drop a comment below! 👇
 
 #reels #reelsfb #facebookreels #viralreels #trendingreels`;
 

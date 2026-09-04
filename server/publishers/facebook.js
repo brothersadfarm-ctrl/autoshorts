@@ -16,8 +16,9 @@ export const publishToFacebook = async (videoPath, seoData, settings) => {
   if (!caption) {
     caption = `${seoData.title || ''}\n\n${seoData.description || ''}`.trim();
   }
-  // Strictly remove any #Shorts or #youtubeshorts or competitor links to prevent Meta reach penalties
+  // Strictly remove any Bengali characters and competitor tags (#Shorts) to ensure 100% English
   caption = caption
+    .replace(/[\u0980-\u09FF]+/g, '')
     .replace(/#Shorts\b/gi, '')
     .replace(/#youtubeshorts\b/gi, '')
     .replace(/\s{3,}/g, '\n\n')

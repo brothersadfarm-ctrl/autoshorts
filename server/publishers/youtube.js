@@ -12,10 +12,12 @@ export const publishToYouTube = async (videoPath, seoData, settings) => {
   const refreshToken = settings.youtube_refresh_token?.trim();
   const privacy = settings.youtube_privacy || 'public';
 
+  const stripBangla = (text) => (text || '').replace(/[\u0980-\u09FF]+/g, '').replace(/\s{2,}/g, ' ').trim();
+
   const ytData = seoData.youtube || seoData;
-  const rawTitle = ytData.title || seoData.title || 'Viral Short Video';
-  const rawDescription = ytData.description || seoData.description || '';
-  const rawTags = ytData.tags || seoData.tags || '';
+  const rawTitle = stripBangla(ytData.title || seoData.title || 'Viral Short Video');
+  const rawDescription = stripBangla(ytData.description || seoData.description || '');
+  const rawTags = stripBangla(ytData.tags || seoData.tags || '');
 
   if (isSimulation || !clientId || !clientSecret || !refreshToken) {
     const simulatedId = `sim_yt_${Date.now()}`;

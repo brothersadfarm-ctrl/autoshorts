@@ -198,20 +198,28 @@ const envYtClientId = process.env.YOUTUBE_CLIENT_ID?.trim();
 const envYtClientSecret = process.env.YOUTUBE_CLIENT_SECRET?.trim();
 const envYtRefreshToken = process.env.YOUTUBE_REFRESH_TOKEN?.trim();
 const envGdriveUrl = process.env.GDRIVE_FOLDER_URL?.trim();
+const envFbAccessToken = process.env.FACEBOOK_ACCESS_TOKEN?.trim();
+const envFbPageId = process.env.FACEBOOK_PAGE_ID?.trim();
+const envGeminiKey = process.env.GEMINI_API_KEY?.trim();
 
-if (envYtClientId || envYtClientSecret || envYtRefreshToken || envGdriveUrl) {
-  try {
-    const firstProj = db.prepare(`SELECT id FROM projects ORDER BY id ASC LIMIT 1`).get();
-    if (firstProj) {
-      if (envYtClientId) db.prepare(`UPDATE projects SET youtube_client_id = ? WHERE id = ?`).run(envYtClientId, firstProj.id);
-      if (envYtClientSecret) db.prepare(`UPDATE projects SET youtube_client_secret = ? WHERE id = ?`).run(envYtClientSecret, firstProj.id);
-      if (envYtRefreshToken) db.prepare(`UPDATE projects SET youtube_refresh_token = ? WHERE id = ?`).run(envYtRefreshToken, firstProj.id);
-      if (envGdriveUrl) db.prepare(`UPDATE projects SET gdrive_folder_url = ? WHERE id = ?`).run(envGdriveUrl, firstProj.id);
-      console.log('Seeded project credentials from environment variables successfully.');
-    }
-  } catch (err) {
-    console.error('Failed to seed credentials from env:', err.message);
+try {
+  const firstProj = db.prepare(`SELECT id FROM projects ORDER BY id ASC LIMIT 1`).get();
+  if (firstProj) {
+    if (envYtClientId) db.prepare(`UPDATE projects SET youtube_client_id = ? WHERE id = ?`).run(envYtClientId, firstProj.id);
+    if (envYtClientSecret) db.prepare(`UPDATE projects SET youtube_client_secret = ? WHERE id = ?`).run(envYtClientSecret, firstProj.id);
+    if (envYtRefreshToken) db.prepare(`UPDATE projects SET youtube_refresh_token = ? WHERE id = ?`).run(envYtRefreshToken, firstProj.id);
+    if (envGdriveUrl) db.prepare(`UPDATE projects SET gdrive_folder_url = ? WHERE id = ?`).run(envGdriveUrl, firstProj.id);
+    if (envFbAccessToken) db.prepare(`UPDATE projects SET facebook_access_token = ? WHERE id = ?`).run(envFbAccessToken, firstProj.id);
+    if (envFbPageId) db.prepare(`UPDATE projects SET facebook_page_id = ? WHERE id = ?`).run(envFbPageId, firstProj.id);
+    // Guarantee 100% English content language
+    db.prepare(`UPDATE projects SET content_language = 'English', default_hashtags = '#Shorts #Reels #Viral #Trending #Cute' WHERE id = ?`).run(firstProj.id);
+    console.log('Seeded project credentials and normalized to English successfully.');
   }
+  if (envGeminiKey) {
+    db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('gemini_api_key', ?)`).run(envGeminiKey);
+  }
+} catch (err) {
+  console.error('Failed to seed credentials from env:', err.message);
 }
 
 export const getSettings = () => {
