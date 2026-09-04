@@ -33,6 +33,22 @@ export function parseDriveLink(link) {
 }
 
 /**
+ * Extracts file IDs from a public Google Drive folder page
+ */
+export async function extractFilesFromFolder(folderId) {
+  const url = `https://drive.google.com/drive/folders/${folderId}`;
+  const res = await axios.get(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    }
+  });
+
+  const html = res.data;
+  const sskMatches = [...html.matchAll(/ssk='5:auSv138:([a-zA-Z0-9_-]{25,45})/g)].map(m => m[1]);
+  return Array.from(new Set(sskMatches));
+}
+
+/**
  * Downloads a public Google Drive video file by ID
  */
 export async function downloadDriveVideo(fileId, targetPath) {

@@ -9,7 +9,7 @@ import db, { getSettings, updateSettings, addLog, getLogs, clearLogs } from './d
 import { getVideoMetadata, processVideo } from './processor.js';
 import { generateSeo } from './seo.js';
 import { startScheduler, getNextScheduledRun, executeVideoPublish } from './scheduler.js';
-import { parseDriveLink, downloadDriveVideo } from './gdrive.js';
+import { parseDriveLink, downloadDriveVideo, extractFilesFromFolder } from './gdrive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -356,19 +356,42 @@ app.post('/api/projects/:id/videos/import-gdrive', async (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
     `);
 
+    // Expand folder links or collect file IDs
+    const fileItems = [];
     for (const link of rawLinks) {
       const parsed = parseDriveLink(link);
-      if (!parsed || parsed.type !== 'file') {
-        errors.push({ link, error: 'সঠিক Google Drive ফাইল লিঙ্ক নয়। (যেমন: https://drive.google.com/file/d/...)' });
+      if (!parsed) {
+        errors.push({ link, error: 'সঠিক Google Drive লিঙ্ক নয়' });
         continue;
       }
 
-      const filename = `${Date.now()}_gdrive_${parsed.id}.mp4`;
+      if (parsed.type === 'folder') {
+        try {
+          addLog('info', `Google Drive ফোল্ডার থেকে ফাইল খোঁজা হচ্ছে... (ID: ${parsed.id})`, link, projectId);
+          const folderFileIds = await extractFilesFromFolder(parsed.id);
+          if (folderFileIds.length === 0) {
+            errors.push({ link, error: 'ফোল্ডারে কোনো ভিডিও ফাইল পাওয়া যায়নি অথবা ফোল্ডারটি পাবলিক নয়' });
+          } else {
+            addLog('info', `Google Drive ফোল্ডারে ${folderFileIds.length}টি ফাইল পাওয়া গেছে!`, '', projectId);
+            for (const fId of folderFileIds) {
+              fileItems.push({ id: fId, link: `https://drive.google.com/file/d/${fId}/view` });
+            }
+          }
+        } catch (fErr) {
+          errors.push({ link, error: `ফোল্ডার রিড করতে ব্যর্থ: ${fErr.message}` });
+        }
+      } else {
+        fileItems.push({ id: parsed.id, link });
+      }
+    }
+
+    for (const item of fileItems) {
+      const filename = `${Date.now()}_gdrive_${item.id}.mp4`;
       const targetPath = path.join(queueDir, filename);
 
       try {
-        addLog('info', `Google Drive থেকে ভিডিও ডাউনলোড হচ্ছে...`, `Link: ${link}`, projectId);
-        await downloadDriveVideo(parsed.id, targetPath);
+        addLog('info', `Google Drive থেকে ভিডিও ডাউনলোড হচ্ছে...`, `Link: ${item.link}`, projectId);
+        await downloadDriveVideo(item.id, targetPath);
 
         const meta = await getVideoMetadata(targetPath);
         const stats = fs.statSync(targetPath);
