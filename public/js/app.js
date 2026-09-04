@@ -231,7 +231,21 @@ async function switchProject(projectId) {
     const sRes = await fetch('/api/settings');
     const sData = await sRes.json();
     const geminiInput = document.getElementById('setting-gemini-key');
-    if (geminiInput) geminiInput.value = sData.gemini_api_key || '';
+    let gemKey = sData.gemini_api_key || '';
+    if (!gemKey) {
+      const cachedGemKey = localStorage.getItem('autoshorts_gemini_key');
+      if (cachedGemKey) {
+        gemKey = cachedGemKey;
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gemini_api_key: gemKey })
+        }).catch(e => console.error('Auto-sync gemini key failed:', e));
+      }
+    } else {
+      localStorage.setItem('autoshorts_gemini_key', gemKey);
+    }
+    if (geminiInput) geminiInput.value = gemKey;
     updateSimModeUI(sData.simulation_mode === '1');
   } catch (e) {
     console.error('Failed to load settings:', e);
@@ -1246,7 +1260,10 @@ async function previewWatermarkTest() {
 
 // ======================== GEMINI API KEY ========================
 async function saveGeminiApiKey() {
-  const key = document.getElementById('setting-gemini-key').value.trim();
+  const keyInput = document.getElementById('setting-gemini-key');
+  if (!keyInput) return;
+  const key = keyInput.value.trim();
+  localStorage.setItem('autoshorts_gemini_key', key);
   try {
     const res = await fetch('/api/settings', {
       method: 'POST',
@@ -1421,28 +1438,6 @@ async function syncNextVideoFromDrive() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down text-amber-400"></i><span>ড্রাইভ থেকে পরবর্তী ১টি ভিডিও আনুন</span>`;
-  }
-}
-
-// Gemini API Key Saver
-async function saveGeminiApiKey() {
-  const input = document.getElementById('setting-gemini-key');
-  if (!input) return;
-  const key = input.value.trim();
-  try {
-    const res = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gemini_api_key: key })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast('Google Gemini API Key সফলভাবে সেভ হয়েছে!', 'success');
-    } else {
-      showToast(data.error || 'Gemini Key সেভ ব্যর্থ', 'error');
-    }
-  } catch (err) {
-    showToast('ত্রুটি: ' + err.message, 'error');
   }
 }
 
