@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: autoshorts-automation
+    runtime: docker
+    plan: free
+    region: singapore
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: NODE_ENV
+        value: production
