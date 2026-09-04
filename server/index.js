@@ -258,14 +258,46 @@ app.post('/api/projects/:id/logo', uploadLogo.single('logo'), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No logo uploaded' });
 
-    db.prepare(`UPDATE projects SET logo_path = ?, watermark_enabled = 1 WHERE id = ?`).run(req.file.path, req.params.id);
-    addLog('success', `Uploaded channel logo / watermark for project #${req.params.id}`, req.file.originalname, req.params.id);
+    const buffer = fs.readFileSync(req.file.path);
+    const ext = path.extname(req.file.originalname).toLowerCase().replace('.', '') || 'png';
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+    const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+
+    db.prepare(`UPDATE projects SET logo_path = ?, logo_data_url = ?, watermark_enabled = 1 WHERE id = ?`).run(req.file.path, dataUrl, req.params.id);
+    addLog('success', `Uploaded permanent channel logo for project #${req.params.id}`, req.file.originalname, req.params.id);
 
     res.json({
       success: true,
       logoPath: req.file.path,
-      logoUrl: `/media/watermark/${req.file.filename}`
+      logoUrl: `/media/watermark/${req.file.filename}`,
+      logoDataUrl: dataUrl
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Save Logo via Base64 (Permanent browser-server auto-sync)
+app.post('/api/projects/:id/logo-base64', (req, res) => {
+  try {
+    const { logoDataUrl } = req.body;
+    if (!logoDataUrl || !logoDataUrl.startsWith('data:image')) {
+      return res.status(400).json({ error: 'Valid image DataURL required' });
+    }
+    const projectId = parseInt(req.params.id);
+    const matches = logoDataUrl.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+    if (!matches) return res.status(400).json({ error: 'Malformed DataURL' });
+
+    const ext = matches[1].toLowerCase() === 'jpeg' ? 'jpg' : 'png';
+    const filename = `logo_proj_${projectId}_permanent.${ext}`;
+    const filePath = path.join(watermarkDir, filename);
+
+    fs.writeFileSync(filePath, Buffer.from(matches[2], 'base64'));
+
+    db.prepare(`UPDATE projects SET logo_path = ?, logo_data_url = ?, watermark_enabled = 1 WHERE id = ?`).run(filePath, logoDataUrl, projectId);
+    addLog('info', `Saved permanent logo backup for project #${projectId}`, filename, projectId);
+
+    res.json({ success: true, logoUrl: `/media/watermark/${filename}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

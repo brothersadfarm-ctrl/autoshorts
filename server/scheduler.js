@@ -238,12 +238,29 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
     const processedFilename = `processed_${Date.now()}_${video.filename}`;
     const processedPath = path.resolve(__dirname, '../uploads/processed', processedFilename);
 
+    // Ensure watermark file exists on disk, or restore from database base64
+    let watermarkPath = project.logo_path;
+    if ((!watermarkPath || !fs.existsSync(watermarkPath)) && project.logo_data_url) {
+      try {
+        const matches = project.logo_data_url.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+        if (matches) {
+          const ext = matches[1].toLowerCase() === 'jpeg' ? 'jpg' : 'png';
+          const watermarkDir = path.resolve(__dirname, '../uploads/watermark');
+          if (!fs.existsSync(watermarkDir)) fs.mkdirSync(watermarkDir, { recursive: true });
+          const reFilePath = path.join(watermarkDir, `logo_proj_${project.id}_restored.${ext}`);
+          fs.writeFileSync(reFilePath, Buffer.from(matches[2], 'base64'));
+          watermarkPath = reFilePath;
+          db.prepare(`UPDATE projects SET logo_path = ? WHERE id = ?`).run(reFilePath, project.id);
+        }
+      } catch(e) {}
+    }
+
     await processVideo(video.file_path, processedPath, {
-      watermarkEnabled: project.watermark_enabled === 1 && !!project.logo_path,
-      watermarkPath: project.logo_path,
+      watermarkEnabled: project.watermark_enabled === 1 && !!watermarkPath,
+      watermarkPath,
       watermarkPosition: project.watermark_position || 'top-right',
-      watermarkScale: project.watermark_scale || 0.16,
-      watermarkOpacity: project.watermark_opacity || 0.85,
+      watermarkScale: project.watermark_scale || 0.13,
+      watermarkOpacity: project.watermark_opacity || 0.75,
       soundNormalizeEnabled: project.sound_normalize_enabled === 1,
       soundTweakEnabled: project.sound_tweak_pitch_tempo === 1
     });

@@ -25,6 +25,7 @@ db.exec(`
     name TEXT NOT NULL,
     description TEXT,
     logo_path TEXT, -- Watermark logo
+    logo_data_url TEXT DEFAULT '',
     niche TEXT DEFAULT 'Viral Facts & Entertainment',
     content_language TEXT DEFAULT 'Bangla & English',
     default_hashtags TEXT DEFAULT '#Shorts #Reels #Viral #Trending #Bangla',
@@ -112,6 +113,9 @@ try {
   }
   if (!projectCols.includes('gdrive_auto_sync')) {
     db.exec(`ALTER TABLE projects ADD COLUMN gdrive_auto_sync INTEGER DEFAULT 1`);
+  }
+  if (!projectCols.includes('logo_data_url')) {
+    db.exec(`ALTER TABLE projects ADD COLUMN logo_data_url TEXT DEFAULT ''`);
   }
 } catch (e) {
   console.log('Migration notice (projects):', e.message);

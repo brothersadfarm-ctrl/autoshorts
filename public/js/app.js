@@ -119,12 +119,19 @@ async function switchProject(projectId) {
   document.getElementById('current-project-desc').textContent = currentProject.description || `চ্যানেল নিশ: ${currentProject.niche || 'General'}`;
 
   // Logo
+  // Logo (with permanent localStorage backup)
   const logoBox = document.getElementById('channel-logo-container');
   const settingsLogoBox = document.getElementById('settings-logo-preview');
-  if (currentProject.logo_path) {
-    const logoUrl = `/media/watermark/${pathBasename(currentProject.logo_path)}?t=${Date.now()}`;
-    logoBox.innerHTML = `<img src="${logoUrl}" class="w-full h-full object-cover">`;
-    settingsLogoBox.innerHTML = `<img src="${logoUrl}" class="w-full h-full object-contain">`;
+  const savedLogoBase64 = localStorage.getItem(`autoshorts_logo_proj_${currentProjectId}`);
+  const activeLogoSrc = currentProject.logo_data_url || savedLogoBase64 || (currentProject.logo_path ? `/media/watermark/${pathBasename(currentProject.logo_path)}?t=${Date.now()}` : '');
+
+  if (activeLogoSrc) {
+    logoBox.innerHTML = `<img src="${activeLogoSrc}" class="w-full h-full object-cover">`;
+    settingsLogoBox.innerHTML = `<img src="${activeLogoSrc}" class="w-full h-full object-contain">`;
+    // If server has no logo but browser has saved base64, auto-sync to server
+    if (savedLogoBase64 && (!currentProject.logo_path || !currentProject.logo_data_url)) {
+      autoSyncLogoToServer(currentProjectId, savedLogoBase64);
+    }
   } else {
     logoBox.innerHTML = `<i class="fa-solid fa-tv"></i>`;
     settingsLogoBox.innerHTML = `<i class="fa-solid fa-image"></i>`;
@@ -781,28 +788,56 @@ async function deleteScheduleSlot(schedId) {
 // ======================== TAB 3: CHANNEL SETTINGS & LOGO ========================
 function initChangeLogoInput() {
   const input = document.getElementById('change-logo-input');
+  if (!input) return;
   input.addEventListener('change', async (e) => {
     if (e.target.files.length === 0) return;
     const file = e.target.files[0];
-    const form = new FormData();
-    form.append('logo', file);
 
-    try {
-      showToast('লোগো আপলোড হচ্ছে...', 'info');
-      const res = await fetch(`/api/projects/${currentProjectId}/logo`, {
-        method: 'POST',
-        body: form
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast('চ্যানেলের লোগো ও ওয়াটারমার্ক সফলভাবে আপডেট হয়েছে!', 'success');
-        await loadProjects();
-        switchProject(currentProjectId);
+    // Read as Base64 DataURL immediately
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const dataUrl = evt.target.result;
+      // Save permanently to browser localStorage
+      localStorage.setItem(`autoshorts_logo_proj_${currentProjectId}`, dataUrl);
+
+      // Instant UI preview
+      const logoBox = document.getElementById('channel-logo-container');
+      const settingsLogoBox = document.getElementById('settings-logo-preview');
+      if (logoBox) logoBox.innerHTML = `<img src="${dataUrl}" class="w-full h-full object-cover">`;
+      if (settingsLogoBox) settingsLogoBox.innerHTML = `<img src="${dataUrl}" class="w-full h-full object-contain">`;
+
+      // Upload base64 & file to server
+      try {
+        showToast('লোগো স্থায়ীভাবে সংরক্ষণ করা হচ্ছে...', 'info');
+        const res = await fetch(`/api/projects/${currentProjectId}/logo-base64`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ logoDataUrl: dataUrl })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('চ্যানেলের লোগো স্থায়ীভাবে মেমরিতে সংরক্ষিত হয়েছে! 🛡️', 'success');
+          loadProjects();
+        }
+      } catch (err) {
+        console.error('Logo sync error:', err);
       }
-    } catch (err) {
-      showToast('লোগো সেভ ব্যর্থ: ' + err.message, 'error');
-    }
+    };
+    reader.readAsDataURL(file);
   });
+}
+
+async function autoSyncLogoToServer(projectId, dataUrl) {
+  try {
+    await fetch(`/api/projects/${projectId}/logo-base64`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ logoDataUrl: dataUrl })
+    });
+    console.log(`Auto-synced permanent logo for project #${projectId} to server`);
+  } catch (err) {
+    console.error('Failed to auto-sync logo:', err);
+  }
 }
 
 async function autoSaveCurrentProject() {
