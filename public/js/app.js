@@ -917,23 +917,27 @@ function updateSimModeUI(simMode) {
   const text = document.getElementById('sim-mode-text');
   const simPill = document.getElementById('simulation-pill');
 
-  if (!btn || !icon || !text) return;
-
   if (simMode) {
-    btn.className = 'px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20';
-    icon.textContent = '🟡';
-    text.textContent = 'Test Mode (Simulation)';
+    if (btn) {
+      btn.className = 'px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 cursor-pointer';
+      if (icon) icon.textContent = '🟡';
+      if (text) text.textContent = 'Simulation Mode (Test)';
+    }
     if (simPill) {
-      simPill.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30';
-      simPill.innerHTML = '<i class="fa-solid fa-flask-vial"></i><span>Simulation Mode</span>';
+      simPill.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition cursor-pointer';
+      simPill.title = 'বর্তমানে টেস্ট মোড চালু। ক্লিক করলে Live Publishing মোডে যাবে।';
+      simPill.innerHTML = '<i class="fa-solid fa-flask-vial text-amber-400"></i><span>🟡 Simulation Mode</span>';
     }
   } else {
-    btn.className = 'px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 animate-pulse';
-    icon.textContent = '🔴';
-    text.textContent = 'Live Publishing (Active)';
+    if (btn) {
+      btn.className = 'px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 bg-red-500/20 border-red-500/40 text-red-300 hover:bg-red-500/30 animate-pulse cursor-pointer';
+      if (icon) icon.textContent = '🔴';
+      if (text) text.textContent = 'Live Publishing (Active)';
+    }
     if (simPill) {
-      simPill.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
-      simPill.innerHTML = '<i class="fa-solid fa-signal text-emerald-400"></i><span>Live Publishing</span>';
+      simPill.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-300 border border-red-500/50 hover:bg-red-500/30 transition cursor-pointer animate-pulse';
+      simPill.title = 'সরাসরি লাইভ আপলোড মোড চালু! ক্লিক করলে টেস্ট মোডে ফিরে যাবে।';
+      simPill.innerHTML = '<i class="fa-solid fa-signal text-red-400"></i><span>🔴 Live Publishing</span>';
     }
   }
 }

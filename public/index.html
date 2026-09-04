@@ -93,11 +93,11 @@
           <span>২৪/৭ ক্লাউড গাইড</span>
         </button>
 
-        <!-- Simulation Pill -->
-        <div id="simulation-pill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+        <!-- Simulation Pill / Mode Toggle Button -->
+        <button type="button" id="simulation-pill" onclick="toggleGlobalSimulationMode()" title="ক্লিক করে Test ও Live মোড পরিবর্তন করুন" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:brightness-125 transition cursor-pointer">
           <i class="fa-solid fa-flask-vial"></i>
-          <span>Simulation Mode</span>
-        </div>
+          <span id="sim-pill-label">🟡 Test Mode (Simulation)</span>
+        </button>
 
       </div>
 
