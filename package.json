@@ -1,0 +1,29 @@
+{
+  "name": "automation-short",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node server/test_pipeline.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@google/genai": "^2.21.0",
+    "axios": "^1.20.0",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "form-data": "^4.0.6",
+    "googleapis": "^178.0.0",
+    "lucide-react": "^1.40.0",
+    "luxon": "^3.7.2",
+    "multer": "^2.3.0",
+    "node-cron": "^4.6.0"
+  }
+}

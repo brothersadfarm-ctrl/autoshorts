@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  autoshorts:
+    build: .
+    container_name: autoshorts-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=5000

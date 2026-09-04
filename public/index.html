@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="bn" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoShorts - চ্যানেল অনুযায়ী স্বয়ংক্রিয় শর্ট ভিডিও পাবলিশার</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- ==================== TOP NAVIGATION HEADER ==================== -->
+  <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-40 px-4 lg:px-8 py-3 transition-all">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand & Project Switcher -->
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-bold text-base">
+            <i class="fa-solid fa-play"></i>
+          </div>
+          <div class="hidden sm:block">
+            <h1 class="text-base font-bold text-white tracking-tight leading-none">AutoShorts</h1>
+            <span class="text-[10px] text-slate-400">24/7 Channel Automation</span>
+          </div>
+        </div>
+
+        <!-- Vertical Divider -->
+        <div class="h-6 w-px bg-slate-800 hidden sm:block"></div>
+
+        <!-- Project Selector Dropdown -->
+        <div class="flex items-center gap-2">
+          <div class="relative">
+            <select id="project-selector" onchange="switchProject(this.value)" class="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-semibold rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 cursor-pointer pr-8 appearance-none">
+              <!-- Dynamically populated by JS -->
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400 text-xs">
+              <i class="fa-solid fa-chevron-down"></i>
+            </div>
+          </div>
+
+          <!-- + New Project Button -->
+          <button onclick="openNewProjectModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all">
+            <i class="fa-solid fa-plus"></i>
+            <span>নতুন চ্যানেল / প্রজেক্ট</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Clock & Status Info -->
+      <div class="flex flex-wrap items-center gap-2.5 text-xs">
+        
+        <!-- Live Clock -->
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-300">
+          <i class="fa-regular fa-clock text-indigo-400"></i>
+          <span id="header-clock" class="font-mono font-bold">--:--:--</span>
+        </div>
+
+        <!-- Next Post Countdown -->
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-950/40 border border-indigo-500/30 text-indigo-300">
+          <i class="fa-solid fa-hourglass-half text-amber-400 animate-pulse"></i>
+          <div>
+            <span class="text-slate-400 text-[11px]">পরবর্তী পোস্ট:</span>
+            <span id="header-countdown" class="font-bold">লোড হচ্ছে...</span>
+            <span id="header-next-slot" class="text-slate-400 text-[10px]"></span>
+          </div>
+        </div>
+
+        <!-- 24/7 Cloud Guide Button -->
+        <button onclick="openCloudGuideModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 font-semibold transition-all">
+          <i class="fa-solid fa-cloud"></i>
+          <span>২৪/৭ ক্লাউড গাইড</span>
+        </button>
+
+        <!-- Simulation Pill -->
+        <div id="simulation-pill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          <i class="fa-solid fa-flask-vial"></i>
+          <span>Simulation Mode</span>
+        </div>
+
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==================== CURRENT PROJECT HEADER CARD ==================== -->
+  <div class="bg-slate-900 border-b border-slate-800/80 px-4 lg:px-8 py-4">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Current Project Brand & Logo -->
+      <div class="flex items-center gap-3.5">
+        <div id="channel-logo-container" class="w-12 h-12 rounded-xl bg-slate-950 border-2 border-slate-700 overflow-hidden flex items-center justify-center text-slate-500 text-xl flex-shrink-0 shadow-md">
+          <i class="fa-solid fa-tv"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h2 id="current-project-name" class="text-lg font-bold text-white tracking-tight">লোড হচ্ছে...</h2>
+            <div id="project-platform-badges" class="flex items-center gap-1">
+              <!-- Dynamic Badges -->
+            </div>
+          </div>
+          <p id="current-project-desc" class="text-xs text-slate-400 mt-0.5">এই চ্যানেলের সমস্ত ভিডিও স্বয়ংক্রিয়ভাবে আপলোড হবে</p>
+        </div>
+      </div>
+
+      <!-- Quick Action: Publish Next Now -->
+      <div class="flex items-center gap-3">
+        <button onclick="publishNextVideoNow()" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all">
+          <i class="fa-solid fa-bolt"></i>
+          <span>Publish Next Video Now</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== SIMPLIFIED TABS ==================== -->
+  <nav class="bg-slate-900/60 border-b border-slate-800/80 px-4 lg:px-8">
+    <div class="max-w-7xl mx-auto flex overflow-x-auto no-scrollbar gap-1 py-2">
+      <button onclick="switchTab('stock')" id="tab-btn-stock" class="tab-btn active-tab flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all">
+        <i class="fa-solid fa-boxes-stacked"></i>
+        <span>১. ভিডিও স্টক (Stock Queue)</span>
+        <span id="nav-stock-badge" class="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-indigo-300">0</span>
+      </button>
+
+      <button onclick="switchTab('schedules')" id="tab-btn-schedules" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-all">
+        <i class="fa-solid fa-clock"></i>
+        <span>২. আপলোডের সময় (Daily Times)</span>
+      </button>
+
+      <button onclick="switchTab('channel-settings')" id="tab-btn-channel-settings" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-all">
+        <i class="fa-solid fa-gear"></i>
+        <span>৩. চ্যানেল ও লোগো সেটিংস (Logo & Accounts)</span>
+      </button>
+
+      <button onclick="switchTab('history')" id="tab-btn-history" class="tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-all">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span>৪. পাবলিশ হিস্টোরি ও লিংক (Links)</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ==================== MAIN WORKSPACE ==================== -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 space-y-6">
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- ==================== TAB 1: VIDEO STOCK QUEUE ==================== -->
+    <section id="tab-stock" class="tab-content space-y-6">
+      
+      <!-- Upload Dropzone Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-cloud-arrow-up text-indigo-400"></i>
+            ভিডিও স্টক আপলোড (Drag & Drop Short Videos)
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">
+            আপনার চ্যানেলের তৈরি করা শর্ট ভিডিওগুলো এখানে একসাথে টেনে এনে ফেলে রাখুন। সিস্টেম স্বয়ংক্রিয়ভাবে ভিডিওতে আপনার <b>চ্যানেলের লোগো ওয়াটারমার্ক</b> বসিয়ে, <b>সাউন্ড মডিফাই</b> করে এবং <b>এআই এসইও</b> তৈরি করে শিডিউল সময়ে আপলোড করবে।
+          </p>
+        </div>
+
+        <!-- Dropzone Box -->
+        <div id="drop-zone" class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-8 text-center bg-slate-950/50 hover:bg-slate-950 transition-all cursor-pointer group">
+          <input type="file" id="video-file-input" multiple accept="video/mp4,video/quicktime,video/webm" class="hidden">
+          <div class="flex flex-col items-center justify-center gap-3 pointer-events-none">
+            <div class="w-14 h-14 rounded-2xl bg-indigo-600/10 text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-600/20 transition-all flex items-center justify-center text-2xl">
+              <i class="fa-solid fa-file-video"></i>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-slate-200">এখানে ভিডিওগুলো টেনে এনে ড্রপ করুন, অথবা ক্লিক করে ফাইল সিলেক্ট করুন</p>
+              <p class="text-xs text-slate-500 mt-1">MP4, MOV, WebM (একসাথে ৫০টি পর্যন্ত ফাইল আপলোড করতে পারেন)</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload Progress -->
+        <div id="upload-progress-container" class="hidden space-y-2 pt-2">
+          <div class="flex justify-between text-xs text-slate-300">
+            <span id="upload-progress-status">আপলোড হচ্ছে...</span>
+            <span id="upload-progress-percent">0%</span>
+          </div>
+          <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div id="upload-progress-bar" class="h-full bg-gradient-to-r from-indigo-500 to-pink-500 w-0 transition-all duration-200"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending Videos List -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-list-check text-indigo-400"></i>
+              স্টকে জমা হওয়া ভিডিওর তালিকা (Queued Videos)
+            </h3>
+            <span class="text-xs text-slate-400">নির্ধারিত সময়ে এই ভিডিওগুলো ক্রমান্বয়ে আপলোড হবে</span>
+          </div>
+          <button onclick="loadCurrentProjectVideos()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-all" title="Refresh">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+        </div>
+
+        <div id="video-list-container" class="space-y-3">
+          <!-- Dynamic Video Items -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== TAB 2: DAILY SCHEDULES ==================== -->
+    <section id="tab-schedules" class="tab-content hidden space-y-6">
+      
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-clock text-indigo-400"></i>
+            এই চ্যানেলের দৈনিক আপলোডের সময়সূচি (Daily Publishing Times)
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">
+            প্রতিদিন ঠিক কোন কোন সময়ে ওয়েবসাইটটি স্বয়ংক্রিয়ভাবে ভিডিও আপলোড করবে তা নিচে নির্ধারণ করুন। আপনি যেকোনো সময় অন/অফ করতে পারেন অথবা নতুন সময় যোগ করতে পারেন।
+          </p>
+        </div>
+
+        <!-- Schedule Slots Grid -->
+        <div id="schedules-list-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <!-- Dynamic Schedule Slot Cards -->
+        </div>
+
+        <!-- Add New Time Slot Form -->
+        <div class="pt-4 border-t border-slate-800 flex flex-wrap items-center gap-3">
+          <span class="text-xs font-semibold text-slate-300">নতুন সময় যোগ করুন:</span>
+          <input type="time" id="new-slot-input" required class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+          <input type="text" id="new-slot-label-input" placeholder="লেবেল (যেমন: সকাল ১০টা)" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+          <button onclick="handleAddScheduleSlot()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-md shadow-indigo-600/20">
+            + সময় সেভ করুন
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== TAB 3: CHANNEL & LOGO SETTINGS ==================== -->
+    <section id="tab-channel-settings" class="tab-content hidden space-y-6">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Watermark / Logo Card -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-stamp text-indigo-400"></i>
+              চ্যানেলের লোগো ও ওয়াটারমার্ক (Watermark Logo)
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              ভিডিও আপলোড করার সময় এই লোগোটি স্বয়ংক্রিয়ভাবে ভিডিওর উপর ওয়াটারমার্ক হিসেবে বসে যাবে।
+            </p>
+          </div>
+
+          <!-- Upload Logo Box -->
+          <div class="flex items-center gap-4 p-4 rounded-xl bg-slate-950/70 border border-slate-800">
+            <div id="settings-logo-preview" class="w-20 h-20 rounded-xl bg-slate-900 border-2 border-slate-700 overflow-hidden flex items-center justify-center text-slate-600 text-2xl flex-shrink-0">
+              <i class="fa-solid fa-image"></i>
+            </div>
+            <div class="space-y-2">
+              <label class="block text-xs font-semibold text-slate-200">লোগো ছবি পরিবর্তন করুন (PNG Recommended)</label>
+              <input type="file" id="change-logo-input" accept="image/png,image/jpeg,image/webp" class="text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer">
+              <p class="text-[10px] text-slate-500">লোগো সিলেক্ট করলেই সাথে সাথে সেভ হবে।</p>
+            </div>
+          </div>
+
+          <!-- Position & Opacity -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">ওয়াটারমার্কের অবস্থান (Position)</label>
+              <select id="setting-wm-position" onchange="autoSaveCurrentProject()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                <option value="top-right">উপরে ডানে (Top-Right)</option>
+                <option value="top-left">উপরে বামে (Top-Left)</option>
+                <option value="bottom-right">নিচে ডানে (Bottom-Right)</option>
+                <option value="bottom-left">নিচে বামে (Bottom-Left)</option>
+                <option value="center">মাঝখানে (Center)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">স্বচ্ছতা (Opacity)</label>
+              <select id="setting-wm-opacity" onchange="autoSaveCurrentProject()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                <option value="1.0">100% (সম্পূর্ণ স্পষ্ট)</option>
+                <option value="0.85" selected>85% (হালকা স্বচ্ছ - আদর্শ)</option>
+                <option value="0.70">70%</option>
+                <option value="0.50">50%</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Sound Options -->
+          <div class="space-y-3 pt-3 border-t border-slate-800">
+            <h4 class="text-xs font-bold text-slate-300">সাউন্ড মডিফিকেশন সেটিংস</h4>
+            
+            <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+              <input type="checkbox" id="setting-sound-norm" onchange="autoSaveCurrentProject()" class="rounded accent-indigo-500 w-4 h-4">
+              <span>অডিও নরম্যালাইজেশন (EBU R128 সাউন্ড ব্যালান্সিং)</span>
+            </label>
+
+            <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+              <input type="checkbox" id="setting-sound-tweak" onchange="autoSaveCurrentProject()" class="rounded accent-indigo-500 w-4 h-4">
+              <span>অডিও টেম্পো মডিফাই (২% পরিবর্তন যা ডুপ্লিকেট অডিও কপিরাইট ফ্ল্যাগ এড়াতে সাহায্য করে)</span>
+            </label>
+          </div>
+
+          <!-- Preview Watermark Test Button -->
+          <div class="pt-2">
+            <button type="button" onclick="previewWatermarkTest()" id="btn-preview-wm" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all">
+              <i class="fa-solid fa-play text-indigo-400"></i>
+              <span>লোগো ওয়াটারমার্ক ও সাউন্ড প্রিভিউ টেস্ট করুন</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Channel Niche & AI SEO Card -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-brain text-indigo-400"></i>
+              স্বয়ংক্রিয় এআই এসইও ও নিশ (Gemini AI SEO)
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              ভিডিওর বিষয়বস্তু অনুযায়ী এআই নিজে থেকেই আকর্ষণীয় ভাইরাল টাইটেল, হুক ডেসক্রিপশন এবং হ্যাশট্যাগ বানাবে।
+            </p>
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">চ্যানেলের ক্যাটাগরি / নিশ (Niche Topic)</label>
+              <input type="text" id="setting-project-niche" placeholder="যেমন: Facts, Gaming, Motivation, Tech Tips" onchange="autoSaveCurrentProject()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <label class="text-xs font-semibold text-slate-300">Google Gemini API Key (ঐচ্ছিক)</label>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-indigo-400 hover:underline">ফ্রি কী পান ↗</a>
+              </div>
+              <input type="password" id="setting-gemini-key" placeholder="AIzaSy..." onchange="saveGeminiApiKey()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500">
+              <p class="text-[10px] text-slate-500 mt-1">কী না দিলেও বিল্ট-ইন ইন্টেলিজেন্ট এসইও ইঞ্জিন স্বয়ংক্রিয়ভাবে টাইটেল বানাবে।</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">ডিফল্ট ভাইরাল হ্যাশট্যাগ</label>
+              <input type="text" id="setting-default-hashtags" value="#Shorts #Reels #Viral #Trending #Bangla" onchange="autoSaveCurrentProject()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+
+          <!-- Publishing Platforms & Account Settings -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-share-nodes text-indigo-400"></i>
+                সোশ্যাল মিডিয়া অ্যাকাউন্ট ও লাইভ আপলোড
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                এখানে আপনার আসল ইউটিউব চ্যানেল ও ফেসবুক পেজ কানেক্ট করুন:
+              </p>
+            </div>
+
+            <!-- Global Live / Simulation Switch -->
+            <div class="text-right">
+              <label class="block text-[11px] font-semibold text-slate-300 mb-1">আপলোড মোড:</label>
+              <button type="button" id="btn-toggle-sim-mode" onclick="toggleGlobalSimulationMode()" class="px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5">
+                <span id="sim-mode-icon">🟡</span>
+                <span id="sim-mode-text">Simulation Mode</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Platform Toggles -->
+          <div class="grid grid-cols-2 gap-4">
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <i class="fa-brands fa-youtube text-red-500 text-xl"></i>
+                <div>
+                  <span class="text-xs font-bold text-white block">YouTube Shorts</span>
+                  <span class="text-[10px] text-slate-500">শর্টস ভিডিও</span>
+                </div>
+              </div>
+              <input type="checkbox" id="setting-pub-yt" onchange="autoSaveCurrentProject()" class="rounded accent-red-500 w-4 h-4">
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <i class="fa-brands fa-facebook text-blue-500 text-xl"></i>
+                <div>
+                  <span class="text-xs font-bold text-white block">Facebook Reels</span>
+                  <span class="text-[10px] text-slate-500">পেজ রিলস</span>
+                </div>
+              </div>
+              <input type="checkbox" id="setting-pub-fb" onchange="autoSaveCurrentProject()" class="rounded accent-blue-500 w-4 h-4">
+            </div>
+          </div>
+
+          <!-- Account Tokens Accordion -->
+          <div class="space-y-3 pt-2">
+            <!-- YouTube Setup -->
+            <details class="bg-slate-950 rounded-xl border border-slate-800 p-3.5 text-xs">
+              <summary class="font-bold text-red-400 cursor-pointer flex items-center justify-between">
+                <span class="flex items-center gap-2">
+                  <i class="fa-brands fa-youtube text-base"></i>
+                  <span>YouTube Channel Credentials (কানেকশন)</span>
+                </span>
+                <span class="text-[10px] text-slate-500 hover:text-slate-300">সেটআপ দেখতে ক্লিক করুন ▾</span>
+              </summary>
+              <div class="space-y-2.5 mt-3 pt-3 border-t border-slate-800">
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">Client ID</label>
+                  <input type="text" id="setting-yt-client-id" placeholder="xxxx.apps.googleusercontent.com" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">Client Secret</label>
+                  <input type="password" id="setting-yt-client-secret" placeholder="GOCSPX-xxxx" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">OAuth Refresh Token</label>
+                  <input type="password" id="setting-yt-refresh-token" placeholder="1//04xxxx..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono">
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="loginWithGoogleOAuth()" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/20">
+                      <i class="fa-brands fa-google"></i>
+                      <span>1-Click Connect with Google</span>
+                    </button>
+
+                    <button type="button" onclick="testYouTubeConnection()" id="btn-test-yt" class="px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 font-semibold text-[11px] transition-all flex items-center gap-1.5">
+                      <i class="fa-solid fa-link"></i>
+                      <span>Test Connection</span>
+                    </button>
+                  </div>
+                  
+                  <a href="https://console.cloud.google.com/" target="_blank" class="text-[11px] text-slate-400 hover:text-indigo-400 underline flex items-center gap-1">
+                    <span>Google Cloud Console</span>
+                    <i class="fa-solid fa-external-link text-[9px]"></i>
+                  </a>
+                </div>
+                <p class="text-[10px] text-slate-500">টিপস: Client ID ও Client Secret দিয়ে সরাসরি <b>1-Click Connect with Google</b> এ ক্লিক করলেই স্বয়ংক্রিয়ভাবে চ্যানেল কানেক্ট হয়ে যাবে!</p>
+                <div id="yt-test-result" class="hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px]"></div>
+              </div>
+            </details>
+
+            <!-- Facebook Setup -->
+            <details class="bg-slate-950 rounded-xl border border-slate-800 p-3.5 text-xs">
+              <summary class="font-bold text-blue-400 cursor-pointer flex items-center justify-between">
+                <span class="flex items-center gap-2">
+                  <i class="fa-brands fa-facebook text-base"></i>
+                  <span>Facebook Page Reels Credentials (কানেকশন)</span>
+                </span>
+                <span class="text-[10px] text-slate-500 hover:text-slate-300">সেটআপ দেখতে ক্লিক করুন ▾</span>
+              </summary>
+              <div class="space-y-2.5 mt-3 pt-3 border-t border-slate-800">
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">Facebook Page ID</label>
+                  <input type="text" id="setting-fb-page-id" placeholder="যেমন: 1098472938472" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">Page Access Token</label>
+                  <input type="password" id="setting-fb-token" placeholder="EAAxxxx..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono">
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                  <button type="button" onclick="testFacebookConnection()" id="btn-test-fb" class="px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 font-semibold text-[11px] transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-link"></i>
+                    <span>Test Facebook Connection</span>
+                  </button>
+                  <a href="https://developers.facebook.com/tools/explorer/" target="_blank" class="text-[11px] text-slate-400 hover:text-indigo-400 underline flex items-center gap-1">
+                    <span>Meta Graph Explorer</span>
+                    <i class="fa-solid fa-external-link text-[9px]"></i>
+                  </a>
+                </div>
+                <div id="fb-test-result" class="hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px]"></div>
+              </div>
+            </details>
+          </div>
+
+          <div class="flex justify-between items-center pt-2">
+            <button onclick="saveProjectSettingsFull()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 transition-all">
+              সেটিংস সেভ করুন
+            </button>
+
+            <button onclick="deleteCurrentProject()" class="text-xs text-rose-400 hover:underline">
+              এই চ্যানেল প্রজেক্ট ডিলিট করুন
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ==================== TAB 4: PUBLISH HISTORY & LIVE LOGS ==================== -->
+    <section id="tab-history" class="tab-content hidden space-y-6">
+      <!-- Published Table -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i>
+            এই চ্যানেলের পাবলিশ হওয়া ভিডিওর হিস্টোরি ও সরাসরি লিঙ্ক
+          </h3>
+          <button onclick="loadCurrentProjectHistory()" class="text-xs text-indigo-400 hover:underline">রিলোড</button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+              <tr>
+                <th class="px-4 py-3 rounded-l-lg">ভিডিও টাইটেল</th>
+                <th class="px-4 py-3">পাবলিশ সময়</th>
+                <th class="px-4 py-3">YouTube Shorts</th>
+                <th class="px-4 py-3">Facebook Reels</th>
+                <th class="px-4 py-3 rounded-r-lg">স্ট্যাটাস</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body" class="divide-y divide-slate-800">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Live Activity Logs Console -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-terminal text-indigo-400"></i>
+            লাইভ অ্যাক্টিভিটি লগ (Live Activity Logs)
+          </h3>
+          <div class="flex items-center gap-2">
+            <button onclick="loadActivityLogs()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-all">
+              <i class="fa-solid fa-arrows-rotate mr-1"></i>রিফ্রেশ
+            </button>
+            <button onclick="clearActivityLogs()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs transition-all">
+              মুছুন
+            </button>
+          </div>
+        </div>
+
+        <div id="logs-console" class="h-64 overflow-y-auto bg-slate-950 rounded-xl p-4 font-mono text-[11px] space-y-1.5 border border-slate-800">
+          <p class="text-slate-600">লগ লোড হচ্ছে...</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== 24/7 CLOUD SETUP GUIDE MODAL ==================== -->
+  <div id="cloud-guide-modal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 lg:p-8 shadow-2xl space-y-5 max-h-[85vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-cloud"></i>
+          </div>
+          <h3 class="text-base font-bold text-white">২৪/৭ ক্লাউড সেটআপ (কম্পিউটার বন্ধ থাকলেও চলবে)</h3>
+        </div>
+        <button onclick="closeCloudGuideModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs text-slate-300 leading-relaxed">
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <h4 class="font-bold text-emerald-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-bolt text-emerald-400"></i>
+            পদ্ধতি ১: Render.com (সবচেয়ে সহজ - ফ্রি ওয়েব সার্ভিস)
+          </h4>
+          <p class="text-slate-400">
+            ১. প্রজেক্ট ফোল্ডারটি আপনার একটি GitHub রিপোজিটরিতে আপলোড করুন।<br>
+            ২. <b>Render.com</b> এ ফ্রি অ্যাকাউন্ট খুলে "New Web Service" দিয়ে গিটহাব কানেক্ট করুন।<br>
+            ৩. Build Command দিন: <code class="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">npm install</code><br>
+            ৪. Start Command দিন: <code class="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">npm start</code><br>
+            ৫. ডিপ্লয় হওয়ার পর এটি একটি লাইভ লিংক পাবে। আপনার কম্পিউটার বন্ধ থাকলেও রেন্ডার ২৪ ঘণ্টা শিডিউল অনুযায়ী ভিডিও আপলোড করতে থাকবে!
+          </p>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <h4 class="font-bold text-blue-300 flex items-center gap-1.5">
+            <i class="fa-brands fa-docker text-blue-400"></i>
+            পদ্ধতি ২: Docker / Docker Compose
+          </h4>
+          <p class="text-slate-400">
+            প্রজেক্টে সম্পূর্ণ রেডি <b>Dockerfile</b> এবং <b>docker-compose.yml</b> রয়েছে। যেকোনো VPS-এ শুধু রান করুন:
+          </p>
+          <div class="p-2.5 rounded-lg bg-slate-900 font-mono text-emerald-400">
+            docker compose up -d
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <h4 class="font-bold text-purple-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-server text-purple-400"></i>
+            পদ্ধতি ৩: ৫ ডলারের Ubuntu VPS (DigitalOcean / Contabo)
+          </h4>
+          <p class="text-slate-400">
+            উবুন্টু সার্ভারে PM2 দিয়ে আজীবন ব্যাকগ্রাউন্ডে চালাতে পারেন:
+          </p>
+          <div class="p-2.5 rounded-lg bg-slate-900 font-mono text-indigo-300">
+            npm install -g pm2<br>
+            pm2 start server/index.js --name "autoshorts"<br>
+            pm2 save
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== NEW PROJECT CREATION MODAL ==================== -->
+  <div id="new-project-modal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-plus"></i>
+          </div>
+          <h3 class="text-base font-bold text-white">নতুন চ্যানেল প্রজেক্ট তৈরি করুন</h3>
+        </div>
+        <button onclick="closeNewProjectModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="new-project-form" onsubmit="handleCreateNewProject(event)" class="space-y-4">
+        
+        <!-- 1. Channel Name -->
+        <div>
+          <label class="block text-xs font-bold text-slate-200 mb-1">১. চ্যানেলের নাম দিন (Channel / Project Name) *</label>
+          <input type="text" id="modal-project-name" required placeholder="যেমন: Tech Bangla, Motivation BD, Funny Clips" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <!-- 2. Logo Upload -->
+        <div>
+          <label class="block text-xs font-bold text-slate-200 mb-1">২. চ্যানেলের লোগো দিন (ভিডিওতে স্বয়ংক্রিয় ওয়াটারমার্ক হবে)</label>
+          <input type="file" id="modal-project-logo" accept="image/png,image/jpeg,image/webp" class="w-full text-xs text-slate-400 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer">
+          <p class="text-[11px] text-slate-500 mt-1">লোগোটি ভিডিওর উপরে ডানে স্বয়ংক্রিয়ভাবে ওয়াটারমার্ক হিসেবে বসবে।</p>
+        </div>
+
+        <!-- 3. Platforms Checkboxes -->
+        <div>
+          <label class="block text-xs font-bold text-slate-200 mb-1.5">৩. কোন কোন প্ল্যাটফর্মে ভিডিও আপলোড করতে চান?</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <input type="checkbox" id="modal-pub-yt" checked class="rounded accent-red-500 w-4 h-4">
+              <span class="text-xs font-semibold text-slate-200"><i class="fa-brands fa-youtube text-red-500 mr-1"></i>YouTube Shorts</span>
+            </label>
+
+            <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <input type="checkbox" id="modal-pub-fb" checked class="rounded accent-blue-500 w-4 h-4">
+              <span class="text-xs font-semibold text-slate-200"><i class="fa-brands fa-facebook text-blue-500 mr-1"></i>Facebook Reels</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 4. Default Posting Times -->
+        <div>
+          <label class="block text-xs font-bold text-slate-200 mb-1.5">৪. প্রতিদিন কোন কোন সময়ে ভিডিও পোস্ট হবে?</label>
+          <div class="grid grid-cols-3 gap-2 text-xs">
+            <label class="flex items-center gap-1.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+              <input type="checkbox" name="modal_times" value="09:00" checked class="accent-indigo-500">
+              <span>সকাল ৯:০০</span>
+            </label>
+            <label class="flex items-center gap-1.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+              <input type="checkbox" name="modal_times" value="14:00" checked class="accent-indigo-500">
+              <span>দুপুর ২:০০</span>
+            </label>
+            <label class="flex items-center gap-1.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+              <input type="checkbox" name="modal_times" value="17:00" checked class="accent-indigo-500">
+              <span>বিকাল ৫:০০</span>
+            </label>
+            <label class="flex items-center gap-1.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+              <input type="checkbox" name="modal_times" value="19:00" checked class="accent-indigo-500">
+              <span>সন্ধ্যা ৭:০০</span>
+            </label>
+            <label class="flex items-center gap-1.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+              <input type="checkbox" name="modal_times" value="21:00" checked class="accent-indigo-500">
+              <span>রাত ৯:০০</span>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs shadow-xl shadow-indigo-600/30 transition-all mt-2">
+          🚀 চ্যানেল প্রজেক্ট তৈরি করুন
+        </button>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Video Inspection Modal -->
+  <div id="video-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl">
+      <div class="p-3.5 border-b border-slate-800 flex items-center justify-between">
+        <h4 id="modal-video-title" class="text-xs font-bold text-white truncate max-w-xs">ভিডিও প্রিভিউ</h4>
+        <button onclick="closeVideoModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-4 flex flex-col items-center bg-black">
+        <video id="modal-video-element" controls class="w-full max-h-[65vh] rounded-lg"></video>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-3.5 px-4 text-center text-xs text-slate-500">
+    AutoShorts &copy; 2026 | Multi-Channel Video Stock, Watermark & Auto-Publisher
+  </footer>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
