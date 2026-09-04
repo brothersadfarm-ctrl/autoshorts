@@ -240,7 +240,7 @@
 
       <!-- Pending Videos List -->
       <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 class="text-base font-bold text-white flex items-center gap-2">
               <i class="fa-solid fa-list-check text-indigo-400"></i>
@@ -248,9 +248,40 @@
             </h3>
             <span class="text-xs text-slate-400">নির্ধারিত সময়ে এই ভিডিওগুলো ক্রমান্বয়ে আপলোড হবে</span>
           </div>
-          <button onclick="loadCurrentProjectVideos()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-all" title="Refresh">
-            <i class="fa-solid fa-arrows-rotate"></i>
-          </button>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Delete Selected Button (hidden until items checked) -->
+            <button id="btn-delete-selected" onclick="deleteSelectedVideos()" class="hidden px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-rose-600/30 transition-all">
+              <i class="fa-solid fa-trash-can"></i>
+              <span id="btn-delete-selected-text">সিলেক্ট করা মুছুন</span>
+            </button>
+
+            <!-- Remove Duplicates Button -->
+            <button onclick="removeDuplicatesFromQueue()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all" title="স্টকে থাকা ডুপ্লিকেট ভিডিও মুছে ১টি কপি রাখবে">
+              <i class="fa-solid fa-clone text-amber-400"></i>
+              <span>ডুপ্লিকেট রিমুভ</span>
+            </button>
+
+            <!-- Clear All Stock Button -->
+            <button onclick="clearAllQueuedVideos()" class="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all" title="স্টকের সমস্ত ভিডিও একসাথে মুছে ফেলুন">
+              <i class="fa-solid fa-trash-arrow-up text-rose-400"></i>
+              <span>সব মুছুন</span>
+            </button>
+
+            <!-- Refresh Button -->
+            <button onclick="loadCurrentProjectVideos()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-all" title="Refresh">
+              <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Select All Checkbox Bar -->
+        <div id="select-all-bar" class="hidden flex items-center justify-between bg-slate-950/70 border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs">
+          <label class="flex items-center gap-2.5 text-slate-300 cursor-pointer font-medium select-none hover:text-white transition-colors">
+            <input type="checkbox" id="select-all-videos-cb" onchange="toggleSelectAllVideos(this.checked)" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-0 cursor-pointer">
+            <span>সবগুলো একসাথে সিলেক্ট করুন (Select All)</span>
+          </label>
+          <span id="selected-videos-counter" class="text-slate-500 font-mono text-[11px]">০টি সিলেক্টেড</span>
         </div>
 
         <div id="video-list-container" class="space-y-3">

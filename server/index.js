@@ -477,6 +477,89 @@ app.delete('/api/videos/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// Bulk Delete Videos
+app.post('/api/projects/:id/videos/bulk-delete', (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'কোনো ভিডিও সিলেক্ট করা হয়নি' });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const videos = db.prepare(`SELECT * FROM videos WHERE project_id = ? AND id IN (${placeholders})`).all(projectId, ...ids);
+
+    for (const v of videos) {
+      try {
+        if (v.file_path && fs.existsSync(v.file_path)) fs.unlinkSync(v.file_path);
+        if (v.processed_path && fs.existsSync(v.processed_path)) fs.unlinkSync(v.processed_path);
+      } catch (e) {}
+    }
+
+    db.prepare(`DELETE FROM videos WHERE project_id = ? AND id IN (${placeholders})`).run(projectId, ...ids);
+    addLog('info', `স্টক থেকে ${videos.length}টি সিলেক্ট করা ভিডিও মুছে ফেলা হয়েছে`, '', projectId);
+    res.json({ success: true, deletedCount: videos.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Clear All Queued (Pending) Videos in Project
+app.delete('/api/projects/:id/videos/clear-queue', (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const videos = db.prepare(`SELECT * FROM videos WHERE project_id = ? AND status = 'pending'`).all(projectId);
+
+    for (const v of videos) {
+      try {
+        if (v.file_path && fs.existsSync(v.file_path)) fs.unlinkSync(v.file_path);
+        if (v.processed_path && fs.existsSync(v.processed_path)) fs.unlinkSync(v.processed_path);
+      } catch (e) {}
+    }
+
+    db.prepare(`DELETE FROM videos WHERE project_id = ? AND status = 'pending'`).run(projectId);
+    addLog('info', `স্টকের সমস্ত পেন্ডিং ভিডিও (${videos.length}টি) মুছে ফেলা হয়েছে`, '', projectId);
+    res.json({ success: true, deletedCount: videos.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Remove Duplicate Videos from Queue
+app.post('/api/projects/:id/videos/remove-duplicates', (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const videos = db.prepare(`SELECT * FROM videos WHERE project_id = ? AND status = 'pending' ORDER BY priority_order ASC, id ASC`).all(projectId);
+
+    const seen = new Set();
+    const duplicateIds = [];
+
+    for (const v of videos) {
+      // Key can be original_name or file_size + duration
+      const key = `${v.original_name}_${v.file_size}_${Math.round(v.duration || 0)}`;
+      if (seen.has(key)) {
+        duplicateIds.push(v.id);
+        try {
+          if (v.file_path && fs.existsSync(v.file_path)) fs.unlinkSync(v.file_path);
+          if (v.processed_path && fs.existsSync(v.processed_path)) fs.unlinkSync(v.processed_path);
+        } catch (e) {}
+      } else {
+        seen.add(key);
+      }
+    }
+
+    if (duplicateIds.length > 0) {
+      const placeholders = duplicateIds.map(() => '?').join(',');
+      db.prepare(`DELETE FROM videos WHERE id IN (${placeholders})`).run(...duplicateIds);
+      addLog('info', `স্টক থেকে ${duplicateIds.length}টি ডুপ্লিকেট ভিডিও অপসারণ করা হয়েছে`, '', projectId);
+    }
+
+    res.json({ success: true, removedCount: duplicateIds.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 4. Schedules in Project
 app.get('/api/projects/:id/schedules', (req, res) => {
   const schedules = db.prepare(`SELECT * FROM schedules WHERE project_id = ? ORDER BY time_slot ASC`).all(req.params.id);

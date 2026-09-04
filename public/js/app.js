@@ -324,15 +324,19 @@ function handleVideoUpload(files) {
 async function loadCurrentProjectVideos() {
   if (!currentProjectId) return;
   const container = document.getElementById('video-list-container');
+  const selectAllBar = document.getElementById('select-all-bar');
+  const btnDeleteSelected = document.getElementById('btn-delete-selected');
 
   try {
     const res = await fetch(`/api/projects/${currentProjectId}/videos`);
     const videos = await res.json();
 
-    const pendingCount = videos.filter(v => v.status === 'pending').length;
-    document.getElementById('nav-stock-badge').textContent = pendingCount;
+    const pendingVideos = videos.filter(v => v.status === 'pending');
+    document.getElementById('nav-stock-badge').textContent = pendingVideos.length;
 
     if (videos.length === 0) {
+      if (selectAllBar) selectAllBar.classList.add('hidden');
+      if (btnDeleteSelected) btnDeleteSelected.classList.add('hidden');
       container.innerHTML = `
         <div class="text-center py-10 border border-slate-800 rounded-xl bg-slate-950/40">
           <i class="fa-solid fa-inbox text-3xl text-slate-600 mb-2"></i>
@@ -342,6 +346,11 @@ async function loadCurrentProjectVideos() {
       `;
       return;
     }
+
+    if (selectAllBar) selectAllBar.classList.remove('hidden');
+    const selectAllCb = document.getElementById('select-all-videos-cb');
+    if (selectAllCb) selectAllCb.checked = false;
+    updateSelectedVideosCounter();
 
     container.innerHTML = videos.map((v, i) => {
       let statusBadge = '';
@@ -360,8 +369,11 @@ async function loadCurrentProjectVideos() {
       const durationSec = Math.round(v.duration || 0);
 
       return `
-        <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition-all">
+        <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition-all group">
           <div class="flex items-center gap-3 min-w-0">
+            <label class="flex items-center cursor-pointer select-none p-1">
+              <input type="checkbox" class="video-item-cb w-4 h-4 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-0 cursor-pointer" value="${v.id}" onchange="updateSelectedVideosCounter()">
+            </label>
             <span class="text-xs font-mono font-bold text-slate-500 w-6 text-center">#${i + 1}</span>
             <button onclick="openVideoModal('${previewSrc}', '${escapeQuotes(v.original_name)}')" class="w-10 h-10 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center text-indigo-400 hover:text-indigo-300 hover:border-indigo-500 transition-all flex-shrink-0">
               <i class="fa-solid fa-play text-xs"></i>
@@ -391,7 +403,7 @@ async function loadCurrentProjectVideos() {
             ${v.youtube_url ? `<a href="${v.youtube_url}" target="_blank" class="p-2 rounded-lg bg-red-600/20 text-red-400 text-xs" title="YouTube Shorts Link"><i class="fa-brands fa-youtube"></i></a>` : ''}
             ${v.facebook_url ? `<a href="${v.facebook_url}" target="_blank" class="p-2 rounded-lg bg-blue-600/20 text-blue-400 text-xs" title="Facebook Reel Link"><i class="fa-brands fa-facebook"></i></a>` : ''}
 
-            <button onclick="deleteVideo(${v.id})" class="p-2 rounded-lg bg-slate-800 hover:text-rose-400 text-slate-400 text-xs transition-all">
+            <button onclick="deleteVideo(${v.id})" class="p-2 rounded-lg bg-slate-800 hover:text-rose-400 text-slate-400 text-xs transition-all" title="মুছে ফেলুন">
               <i class="fa-regular fa-trash-can"></i>
             </button>
           </div>
@@ -400,6 +412,114 @@ async function loadCurrentProjectVideos() {
     }).join('');
   } catch (err) {
     container.innerHTML = `<p class="text-xs text-rose-400">ভিডিও লোড ব্যর্থ: ${err.message}</p>`;
+  }
+}
+
+// Bulk Selection & Delete Handlers
+function toggleSelectAllVideos(checked) {
+  document.querySelectorAll('.video-item-cb').forEach(cb => {
+    cb.checked = checked;
+  });
+  updateSelectedVideosCounter();
+}
+
+function updateSelectedVideosCounter() {
+  const selected = Array.from(document.querySelectorAll('.video-item-cb:checked'));
+  const counter = document.getElementById('selected-videos-counter');
+  const btnDelete = document.getElementById('btn-delete-selected');
+  const btnDeleteText = document.getElementById('btn-delete-selected-text');
+  const allCbs = document.querySelectorAll('.video-item-cb');
+  const selectAllCb = document.getElementById('select-all-videos-cb');
+
+  if (counter) counter.textContent = `${selected.length}টি সিলেক্টেড`;
+
+  if (selectAllCb && allCbs.length > 0) {
+    selectAllCb.checked = selected.length === allCbs.length;
+  }
+
+  if (btnDelete) {
+    if (selected.length > 0) {
+      btnDelete.classList.remove('hidden');
+      if (btnDeleteText) btnDeleteText.textContent = `সিলেক্ট করা মুছুন (${selected.length})`;
+    } else {
+      btnDelete.classList.add('hidden');
+    }
+  }
+}
+
+async function deleteSelectedVideos() {
+  if (!currentProjectId) return;
+  const selectedCbs = Array.from(document.querySelectorAll('.video-item-cb:checked'));
+  const ids = selectedCbs.map(cb => parseInt(cb.value)).filter(id => !isNaN(id));
+
+  if (ids.length === 0) {
+    showToast('দয়া করে অন্তত একটি ভিডিও সিলেক্ট করুন', 'warn');
+    return;
+  }
+
+  if (!confirm(`আপনি কি নির্বাচিত ${ids.length}টি ভিডিও নিশ্চিতভাবে মুছে ফেলতে চান?`)) return;
+
+  try {
+    const res = await fetch(`/api/projects/${currentProjectId}/videos/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`${data.deletedCount}টি ভিডিও সফলভাবে মুছে ফেলা হয়েছে!`, 'success');
+      loadCurrentProjectVideos();
+      loadStatus();
+    } else {
+      showToast(`ব্যর্থ: ${data.error}`, 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
+  }
+}
+
+async function clearAllQueuedVideos() {
+  if (!currentProjectId) return;
+  if (!confirm(`⚠️ সতর্কবার্তা:\n\nআপনি কি "${currentProject?.name || 'এই চ্যানেলের'}" স্টকে জমা থাকা সমস্ত কিউড ভিডিও এক ক্লিকে মুছে ফেলতে চান?\n\nএটি পূর্বাবস্থায় ফেরানো যাবে না!`)) return;
+
+  try {
+    const res = await fetch(`/api/projects/${currentProjectId}/videos/clear-queue`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`স্টকের সমস্ত ভিডিও (${data.deletedCount}টি) মুছে পরিষ্কার করা হয়েছে!`, 'info');
+      loadCurrentProjectVideos();
+      loadStatus();
+    } else {
+      showToast(`ব্যর্থ: ${data.error}`, 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
+  }
+}
+
+async function removeDuplicatesFromQueue() {
+  if (!currentProjectId) return;
+  try {
+    showToast('ডুপ্লিকেট ভিডিও খোঁজা হচ্ছে...', 'info');
+    const res = await fetch(`/api/projects/${currentProjectId}/videos/remove-duplicates`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (data.removedCount > 0) {
+        showToast(`অভিনন্দন! স্টক থেকে ${data.removedCount}টি ডুপ্লিকেট ভিডিও সফলভাবে মুছে ১টি করে ইউনিক ভিডিও রাখা হয়েছে!`, 'success');
+      } else {
+        showToast('স্টকে কোনো ডুপ্লিকেট ভিডিও পাওয়া যায়নি! সবগুলো ভিডিওই ইউনিক।', 'info');
+      }
+      loadCurrentProjectVideos();
+      loadStatus();
+    } else {
+      showToast(`ব্যর্থ: ${data.error}`, 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
   }
 }
 
