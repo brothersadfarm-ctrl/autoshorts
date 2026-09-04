@@ -11,11 +11,23 @@ export const publishToFacebook = async (videoPath, seoData, settings) => {
   const pageToken = settings.facebook_access_token?.trim();
   const pageId = settings.facebook_page_id?.trim();
 
+  const fbData = seoData.facebook || seoData;
+  let caption = fbData.caption || seoData.facebookCaption || seoData.caption || '';
+  if (!caption) {
+    caption = `${seoData.title || ''}\n\n${seoData.description || ''}`.trim();
+  }
+  // Strictly remove any #Shorts or #youtubeshorts or competitor links to prevent Meta reach penalties
+  caption = caption
+    .replace(/#Shorts\b/gi, '')
+    .replace(/#youtubeshorts\b/gi, '')
+    .replace(/\s{3,}/g, '\n\n')
+    .trim();
+
   if (isSimulation || !pageToken || !pageId) {
     const simulatedId = `sim_fb_${Date.now()}`;
     const simulatedUrl = `https://facebook.com/reel/${simulatedId}`;
     addLog('info', `[SIMULATION MODE] Facebook Reels publish simulated`, {
-      title: seoData.title,
+      captionHook: caption.slice(0, 80),
       url: simulatedUrl
     });
     return {
@@ -27,10 +39,9 @@ export const publishToFacebook = async (videoPath, seoData, settings) => {
   }
 
   try {
-    addLog('info', `Uploading video to Facebook Reels for Page: ${pageId}`);
+    addLog('info', `Uploading video to Facebook Reels with viral social caption (Page: ${pageId}): "${caption.slice(0, 50)}..."`);
 
     const fileSize = fs.statSync(videoPath).size;
-    const caption = `${seoData.title}\n\n${seoData.description || ''}`.trim();
 
     // 1. Initialize Reel upload session
     const startUrl = `https://graph.facebook.com/v20.0/${pageId}/video_reels`;

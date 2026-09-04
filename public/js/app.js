@@ -1424,5 +1424,83 @@ async function syncNextVideoFromDrive() {
   }
 }
 
+// Gemini API Key Saver
+async function saveGeminiApiKey() {
+  const input = document.getElementById('setting-gemini-key');
+  if (!input) return;
+  const key = input.value.trim();
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gemini_api_key: key })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Google Gemini API Key সফলভাবে সেভ হয়েছে!', 'success');
+    } else {
+      showToast(data.error || 'Gemini Key সেভ ব্যর্থ', 'error');
+    }
+  } catch (err) {
+    showToast('ত্রুটি: ' + err.message, 'error');
+  }
+}
 
+// Dual-Platform SEO Live Tester (YouTube vs Facebook)
+async function testDualPlatformSeo() {
+  const topicInput = document.getElementById('test-seo-topic-input');
+  const btn = document.getElementById('btn-test-dual-seo');
+  const resultBox = document.getElementById('test-seo-result-box');
+  const topic = topicInput ? topicInput.value.trim() : '';
 
+  if (!topic) {
+    showToast('দয়া করে ভিডিওর একটি টপিক বা নাম লিখুন (যেমন: cute baby kitten first meow)', 'warn');
+    if (topicInput) topicInput.focus();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> অ্যানালাইসিস হচ্ছে...`;
+
+  try {
+    showToast('Gemini 3.5 Flash দিয়ে ভিডিও বিশ্লেষণ ও প্ল্যাটফর্মভিত্তিক এসইও তৈরি হচ্ছে...', 'info');
+
+    const res = await fetch('/api/test/seo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: topic,
+        projectId: currentProjectId
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      showToast('এআই টেস্ট ব্যর্থ: ' + data.error, 'error');
+      return;
+    }
+
+    // Populate Results
+    resultBox.classList.remove('hidden');
+
+    const analysisEl = document.getElementById('test-seo-analysis');
+    const ytTitleEl = document.getElementById('test-seo-yt-title');
+    const ytDescEl = document.getElementById('test-seo-yt-desc');
+    const ytTagsEl = document.getElementById('test-seo-yt-tags');
+    const fbCaptionEl = document.getElementById('test-seo-fb-caption');
+
+    if (analysisEl) analysisEl.textContent = data.analysis || 'High-converting viral hook identified for both platforms.';
+    if (ytTitleEl) ytTitleEl.textContent = data.youtube?.title || data.title || '';
+    if (ytDescEl) ytDescEl.textContent = data.youtube?.description || data.description || '';
+    if (ytTagsEl) ytTagsEl.textContent = data.youtube?.tags || data.tags || '';
+    if (fbCaptionEl) fbCaptionEl.textContent = data.facebook?.caption || data.facebookCaption || '';
+
+    showToast('সফল! YouTube Shorts ও Facebook Reels এর জন্য প্ল্যাটফর্মভিত্তিক ভাইরাল এসইও তৈরি হয়েছে!', 'success');
+  } catch (err) {
+    showToast('টেস্ট রিকোয়েস্ট ব্যর্থ: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fa-solid fa-bolt"></i> টেস্ট এসইও`;
+  }
+}

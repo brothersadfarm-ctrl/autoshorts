@@ -296,19 +296,19 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
       facebook_page_id: project.facebook_page_id
     };
 
-    // YouTube Shorts
+    // YouTube Shorts (with YouTube-optimized CTR title, search description, and tags)
     if (project.publish_youtube === 1) {
       try {
-        ytResult = await publishToYouTube(processedPath, seoData, platformSettings);
+        ytResult = await publishToYouTube(processedPath, seoData.youtube || seoData, platformSettings);
       } catch (ytErr) {
         addLog('error', `YouTube upload failed: ${ytErr.message}`, '', project.id);
       }
     }
 
-    // Facebook Reels
+    // Facebook Reels (with viral scroll-stopping hook, engagement CTA, and FB hashtags)
     if (project.publish_facebook === 1) {
       try {
-        fbResult = await publishToFacebook(processedPath, seoData, platformSettings);
+        fbResult = await publishToFacebook(processedPath, seoData.facebook || seoData, platformSettings);
       } catch (fbErr) {
         addLog('error', `Facebook upload failed: ${fbErr.message}`, '', project.id);
       }
@@ -320,6 +320,10 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
 
     const status = isSuccess ? 'published' : 'failed';
     const errorMsg = !isSuccess ? 'One or more platform uploads failed' : null;
+
+    const savedTitle = seoData.youtube?.title || seoData.title;
+    const savedDesc = seoData.youtube?.description || seoData.description;
+    const savedTags = seoData.youtube?.tags || seoData.tags;
 
     db.prepare(`
       UPDATE videos
@@ -338,9 +342,9 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
     `).run(
       status,
       processedPath,
-      seoData.title,
-      seoData.description,
-      seoData.tags,
+      savedTitle,
+      savedDesc,
+      savedTags,
       ytResult.videoId || null,
       ytResult.url || null,
       fbResult.postId || null,
@@ -361,7 +365,9 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
     }
 
     addLog('success', `🎉 Video #${video.id} workflow completed for "${project.name}"! Status: ${status}`, {
-      title: seoData.title,
+      aiAnalysis: seoData.analysis || '',
+      youtubeTitle: savedTitle,
+      facebookCaptionHook: (seoData.facebook?.caption || seoData.description || '').slice(0, 85) + '...',
       youtubeUrl: ytResult.url,
       facebookUrl: fbResult.url
     }, project.id);
