@@ -221,7 +221,8 @@ try {
 
   // Seed previously published Google Drive IDs to permanently avoid duplicate uploads
   const seedPublishedIds = [
-    { gdriveId: '1QjVX5Ol2_TH8dWnqdppX_y4u_MbEJhOt', name: 'ai cat (1).mp4' }
+    { gdriveId: '1QjVX5Ol2_TH8dWnqdppX_y4u_MbEJhOt', name: 'ai cat (1).mp4' },
+    { gdriveId: '1XJEdRqcAhnXD0qoN4AlocRzG9Q4vtgdT', name: 'ai cat (153).mp4' }
   ];
   for (const item of seedPublishedIds) {
     try {

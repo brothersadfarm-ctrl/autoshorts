@@ -9,6 +9,7 @@ import { generateSeo } from './seo.js';
 import { publishToYouTube } from './publishers/youtube.js';
 import { publishToFacebook } from './publishers/facebook.js';
 import { parseDriveLink, extractFilesFromFolder, downloadDriveVideo } from './gdrive.js';
+import { google } from 'googleapis';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,11 +108,13 @@ export const fetchNextVideoFromDrive = async (project) => {
 
     const existingIds = new Set([
       '1QjVX5Ol2_TH8dWnqdppX_y4u_MbEJhOt', // Permanently mark test video ai cat (1).mp4 as already published
+      '1XJEdRqcAhnXD0qoN4AlocRzG9Q4vtgdT', // Permanently mark ai cat (153).mp4 as already published
       ...existingVideos.map(v => v.gdrive_file_id).filter(Boolean),
       ...trackedPublished.map(v => v.gdrive_file_id).filter(Boolean)
     ]);
     const existingNames = new Set([
       'ai cat (1).mp4',
+      'ai cat (153).mp4',
       ...existingVideos.map(v => v.original_name).filter(Boolean),
       ...trackedPublished.map(v => v.original_name).filter(Boolean)
     ]);
@@ -240,7 +243,7 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
     const processedFilename = `processed_${Date.now()}_${video.filename}`;
     const processedPath = path.resolve(__dirname, '../uploads/processed', processedFilename);
 
-    // Ensure watermark file exists on disk, or restore from database base64
+    // Ensure watermark file exists on disk, or restore from database base64 / auto-fetch from channel avatar
     let watermarkPath = project.logo_path;
     if ((!watermarkPath || !fs.existsSync(watermarkPath)) && project.logo_data_url) {
       try {
@@ -257,12 +260,37 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
       } catch(e) {}
     }
 
+    // If no watermark uploaded yet, auto-fetch the channel's official logo from YouTube!
+    if ((!watermarkPath || !fs.existsSync(watermarkPath)) && project.youtube_refresh_token && project.youtube_client_id) {
+      try {
+        const oauth2Client = new google.auth.OAuth2(project.youtube_client_id, project.youtube_client_secret, 'https://developers.google.com/oauthplayground');
+        oauth2Client.setCredentials({ refresh_token: project.youtube_refresh_token });
+        const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+        const chRes = await youtube.channels.list({ part: ['snippet'], mine: true });
+        const avatarUrl = chRes.data?.items?.[0]?.snippet?.thumbnails?.high?.url || chRes.data?.items?.[0]?.snippet?.thumbnails?.default?.url;
+        if (avatarUrl) {
+          const aRes = await fetch(avatarUrl);
+          const buf = Buffer.from(await aRes.arrayBuffer());
+          const watermarkDir = path.resolve(__dirname, '../uploads/watermark');
+          if (!fs.existsSync(watermarkDir)) fs.mkdirSync(watermarkDir, { recursive: true });
+          const autoLogoPath = path.join(watermarkDir, `logo_proj_${project.id}_autofetched.png`);
+          fs.writeFileSync(autoLogoPath, buf);
+          const dataUrl = 'data:image/png;base64,' + buf.toString('base64');
+          watermarkPath = autoLogoPath;
+          db.prepare(`UPDATE projects SET logo_path = ?, logo_data_url = ? WHERE id = ?`).run(autoLogoPath, dataUrl, project.id);
+          addLog('info', `চ্যানেলের অফিশিয়াল ইউটিউব লোগো স্বয়ংক্রিয়ভাবে ওয়াটারমার্ক হিসেবে সেট করা হয়েছে!`, '', project.id);
+        }
+      } catch (autoLogoErr) {
+        console.log('Auto-fetch logo error:', autoLogoErr.message);
+      }
+    }
+
     await processVideo(video.file_path, processedPath, {
       watermarkEnabled: project.watermark_enabled === 1 && !!watermarkPath,
       watermarkPath,
       watermarkPosition: project.watermark_position || 'top-right',
-      watermarkScale: project.watermark_scale || 0.13,
-      watermarkOpacity: project.watermark_opacity || 0.75,
+      watermarkScale: project.watermark_scale || 0.16,
+      watermarkOpacity: project.watermark_opacity || 0.85,
       soundNormalizeEnabled: project.sound_normalize_enabled === 1,
       soundTweakEnabled: project.sound_tweak_pitch_tempo === 1
     });
