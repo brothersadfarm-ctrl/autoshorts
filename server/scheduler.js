@@ -106,10 +106,12 @@ export const fetchNextVideoFromDrive = async (project) => {
     const trackedPublished = db.prepare(`SELECT gdrive_file_id, original_name FROM published_tracker WHERE project_id = ?`).all(project.id);
 
     const existingIds = new Set([
+      '1QjVX5Ol2_TH8dWnqdppX_y4u_MbEJhOt', // Permanently mark test video ai cat (1).mp4 as already published
       ...existingVideos.map(v => v.gdrive_file_id).filter(Boolean),
       ...trackedPublished.map(v => v.gdrive_file_id).filter(Boolean)
     ]);
     const existingNames = new Set([
+      'ai cat (1).mp4',
       ...existingVideos.map(v => v.original_name).filter(Boolean),
       ...trackedPublished.map(v => v.original_name).filter(Boolean)
     ]);
@@ -265,19 +267,20 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
       soundTweakEnabled: project.sound_tweak_pitch_tempo === 1
     });
 
-    // 2. AI SEO Generation with Project Niche & Language
+    // 2. AI SEO Generation with Visual Frame Analysis & 100% English Setting
     const seoSettings = {
       gemini_api_key: globalSettings.gemini_api_key,
       channel_niche: project.niche || 'Viral Facts & Entertainment',
-      content_language: project.content_language || 'Bangla & English',
-      default_hashtags: project.default_hashtags || '#Shorts #Reels #Viral #Trending #Bangla',
+      content_language: 'English',
+      default_hashtags: (project.default_hashtags || '#Shorts #Reels #Viral #Trending #Cute').replace(/#Bangla\b/gi, '').trim(),
       seo_prompt_custom: ''
     };
 
     const seoData = await generateSeo(
       {
         originalName: video.original_name,
-        customNotes: video.title || ''
+        customNotes: video.title || '',
+        videoPath: processedPath || video.file_path
       },
       seoSettings
     );
@@ -293,7 +296,8 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
       youtube_refresh_token: project.youtube_refresh_token,
       youtube_privacy: project.youtube_privacy || 'public',
       facebook_access_token: project.facebook_access_token,
-      facebook_page_id: project.facebook_page_id
+      facebook_page_id: project.facebook_page_id,
+      gdrive_file_id: video.gdrive_file_id
     };
 
     // YouTube Shorts (with YouTube-optimized CTR title, search description, and tags)

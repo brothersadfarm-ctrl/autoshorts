@@ -63,10 +63,10 @@ export const publishToYouTube = async (videoPath, seoData, settings) => {
         requestBody: {
           snippet: {
             title: title.slice(0, 100),
-            description: rawDescription.toLowerCase().includes('#shorts') ? rawDescription : `${rawDescription}\n\n#Shorts`,
+            description: (rawDescription.toLowerCase().includes('#shorts') ? rawDescription : `${rawDescription}\n\n#Shorts`) + (settings.gdrive_file_id ? `\n\n[GD:${settings.gdrive_file_id}]` : ''),
             tags: tagArray,
             categoryId: '24', // Entertainment
-            defaultLanguage: 'bn'
+            defaultLanguage: 'en'
           },
           status: {
             privacyStatus: privacy,

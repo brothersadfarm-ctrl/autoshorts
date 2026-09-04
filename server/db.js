@@ -218,6 +218,19 @@ try {
   if (envGeminiKey) {
     db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('gemini_api_key', ?)`).run(envGeminiKey);
   }
+
+  // Seed previously published Google Drive IDs to permanently avoid duplicate uploads
+  const seedPublishedIds = [
+    { gdriveId: '1QjVX5Ol2_TH8dWnqdppX_y4u_MbEJhOt', name: 'ai cat (1).mp4' }
+  ];
+  for (const item of seedPublishedIds) {
+    try {
+      db.prepare(`
+        INSERT OR IGNORE INTO published_tracker (project_id, gdrive_file_id, original_name)
+        VALUES (1, ?, ?)
+      `).run(item.gdriveId, item.name);
+    } catch(e) {}
+  }
 } catch (err) {
   console.error('Failed to seed credentials from env:', err.message);
 }
