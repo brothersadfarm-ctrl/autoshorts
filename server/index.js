@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { DateTime } from 'luxon';
-import db, { getSettings, updateSettings, addLog, getLogs, clearLogs, isAlreadyPublished } from './db.js';
+import db, { getSettings, updateSettings, addLog, getLogs, clearLogs, isAlreadyPublished, recordPublishedVideo } from './db.js';
 import { getVideoMetadata, processVideo } from './processor.js';
 import { generateSeo } from './seo.js';
 import { startScheduler, getNextScheduledRun, executeVideoPublish, fetchNextVideoFromDrive } from './scheduler.js';
@@ -528,6 +528,46 @@ app.post('/api/videos/:id/publish-now', async (req, res) => {
   const videoId = parseInt(req.params.id);
   const result = await executeVideoPublish({ videoId, triggerSource: 'Manual Instant Trigger' });
   res.json(result);
+});
+
+// Sync or Update Video Publish Status
+app.post('/api/videos/:id/sync-published', (req, res) => {
+  try {
+    const videoId = parseInt(req.params.id);
+    const { status, facebook_post_id, facebook_url, youtube_video_id, youtube_url } = req.body;
+    const video = db.prepare(`SELECT * FROM videos WHERE id = ?`).get(videoId);
+    if (!video) return res.status(404).json({ error: 'Video not found' });
+
+    db.prepare(`
+      UPDATE videos
+      SET status = COALESCE(?, status),
+          facebook_post_id = COALESCE(?, facebook_post_id),
+          facebook_url = COALESCE(?, facebook_url),
+          youtube_video_id = COALESCE(?, youtube_video_id),
+          youtube_url = COALESCE(?, youtube_url),
+          error_message = NULL,
+          published_at = datetime('now', 'localtime')
+      WHERE id = ?
+    `).run(status, facebook_post_id, facebook_url, youtube_video_id, youtube_url, videoId);
+
+    const isDone = status === 'published' || ((facebook_post_id || video.facebook_post_id) && (youtube_video_id || video.youtube_video_id));
+    if (isDone) {
+      db.prepare(`UPDATE videos SET status = 'published', error_message = NULL WHERE id = ?`).run(videoId);
+      recordPublishedVideo({
+        projectId: video.project_id,
+        gdriveFileId: video.gdrive_file_id,
+        originalName: video.original_name,
+        fileSize: video.file_size,
+        youtubeVideoId: youtube_video_id || video.youtube_video_id,
+        facebookPostId: facebook_post_id || video.facebook_post_id
+      });
+    }
+
+    addLog('success', `Video #${videoId} synced to published state`, '', video.project_id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Delete Video

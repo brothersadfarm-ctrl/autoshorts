@@ -287,15 +287,23 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
       }
     }
 
-    await processVideo(video.file_path, processedPath, {
-      watermarkEnabled: project.watermark_enabled === 1 && !!watermarkPath,
-      watermarkPath,
-      watermarkPosition: project.watermark_position || 'top-right',
-      watermarkScale: project.watermark_scale || 0.16,
-      watermarkOpacity: project.watermark_opacity || 0.85,
-      soundNormalizeEnabled: project.sound_normalize_enabled === 1,
-      soundTweakEnabled: project.sound_tweak_pitch_tempo === 1
-    });
+    let processedPath = video.processed_path;
+    if (processedPath && fs.existsSync(processedPath)) {
+      addLog('info', `পূর্বে প্রসেস করা ভিডিওটি পুনরায় ব্যবহার করা হচ্ছে: ${path.basename(processedPath)}`, '', project.id);
+    } else {
+      const processedFilename = `processed_${Date.now()}_${video.filename}`;
+      processedPath = path.resolve(__dirname, '../uploads/processed', processedFilename);
+
+      await processVideo(video.file_path, processedPath, {
+        watermarkEnabled: project.watermark_enabled === 1 && !!watermarkPath,
+        watermarkPath,
+        watermarkPosition: project.watermark_position || 'top-right',
+        watermarkScale: project.watermark_scale || 0.16,
+        watermarkOpacity: project.watermark_opacity || 0.85,
+        soundNormalizeEnabled: project.sound_normalize_enabled === 1,
+        soundTweakEnabled: project.sound_tweak_pitch_tempo === 1
+      });
+    }
 
     // 2. AI SEO Generation with Visual Frame Analysis & 100% English Setting
     const seoSettings = {
@@ -332,19 +340,29 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
 
     // YouTube Shorts (with YouTube-optimized CTR title, search description, and tags)
     if (project.publish_youtube === 1) {
-      try {
-        ytResult = await publishToYouTube(processedPath, seoData.youtube || seoData, platformSettings);
-      } catch (ytErr) {
-        addLog('error', `YouTube upload failed: ${ytErr.message}`, '', project.id);
+      if (video.youtube_video_id) {
+        ytResult = { success: true, videoId: video.youtube_video_id, url: video.youtube_url };
+        addLog('info', `YouTube Shorts ইতিমধ্যে সফলভাবে পোস্ট করা আছে: ${video.youtube_url}`, '', project.id);
+      } else {
+        try {
+          ytResult = await publishToYouTube(processedPath, seoData.youtube || seoData, platformSettings);
+        } catch (ytErr) {
+          addLog('error', `YouTube upload failed: ${ytErr.message}`, '', project.id);
+        }
       }
     }
 
     // Facebook Reels (with viral scroll-stopping hook, engagement CTA, and FB hashtags)
     if (project.publish_facebook === 1) {
-      try {
-        fbResult = await publishToFacebook(processedPath, seoData.facebook || seoData, platformSettings);
-      } catch (fbErr) {
-        addLog('error', `Facebook upload failed: ${fbErr.message}`, '', project.id);
+      if (video.facebook_post_id) {
+        fbResult = { success: true, postId: video.facebook_post_id, url: video.facebook_url };
+        addLog('info', `Facebook Reel ইতিমধ্যে সফলভাবে পোস্ট করা আছে: ${video.facebook_url}`, '', project.id);
+      } else {
+        try {
+          fbResult = await publishToFacebook(processedPath, seoData.facebook || seoData, platformSettings);
+        } catch (fbErr) {
+          addLog('error', `Facebook upload failed: ${fbErr.message}`, '', project.id);
+        }
       }
     }
 
