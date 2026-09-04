@@ -542,6 +542,15 @@ app.delete('/api/videos/:id', (req, res) => {
     console.error('File cleanup error:', e);
   }
 
+  try {
+    if (video.gdrive_file_id) {
+      db.prepare(`DELETE FROM published_tracker WHERE project_id = ? AND gdrive_file_id = ?`).run(video.project_id, video.gdrive_file_id);
+    }
+    if (video.original_name) {
+      db.prepare(`DELETE FROM published_tracker WHERE project_id = ? AND original_name = ?`).run(video.project_id, video.original_name);
+    }
+  } catch(e) {}
+
   db.prepare(`DELETE FROM videos WHERE id = ?`).run(req.params.id);
   addLog('info', `Deleted video #${video.id} ("${video.original_name}")`, '', video.project_id);
   res.json({ success: true });
@@ -590,6 +599,28 @@ app.delete('/api/projects/:id/videos/clear-queue', (req, res) => {
     db.prepare(`DELETE FROM videos WHERE project_id = ? AND status = 'pending'`).run(projectId);
     addLog('info', `স্টকের সমস্ত পেন্ডিং ভিডিও (${videos.length}টি) মুছে ফেলা হয়েছে`, '', projectId);
     res.json({ success: true, deletedCount: videos.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset published tracker (useful to retry/re-publish videos)
+app.post('/api/projects/:id/reset-tracker', (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const { gdriveFileId, originalName } = req.body || {};
+    if (gdriveFileId) {
+      db.prepare(`DELETE FROM published_tracker WHERE project_id = ? AND gdrive_file_id = ?`).run(projectId, gdriveFileId);
+      db.prepare(`DELETE FROM videos WHERE project_id = ? AND gdrive_file_id = ?`).run(projectId, gdriveFileId);
+    } else if (originalName) {
+      db.prepare(`DELETE FROM published_tracker WHERE project_id = ? AND original_name = ?`).run(projectId, originalName);
+      db.prepare(`DELETE FROM videos WHERE project_id = ? AND original_name = ?`).run(projectId, originalName);
+    } else {
+      db.prepare(`DELETE FROM published_tracker WHERE project_id = ?`).run(projectId);
+      db.prepare(`DELETE FROM videos WHERE project_id = ?`).run(projectId);
+    }
+    addLog('info', `Reset published tracker for project #${projectId}`, '', projectId);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

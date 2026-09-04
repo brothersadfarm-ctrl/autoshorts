@@ -40,7 +40,7 @@ db.exec(`
     watermark_enabled INTEGER DEFAULT 1,
     watermark_position TEXT DEFAULT 'floating',
     watermark_scale REAL DEFAULT 0.16,
-    watermark_opacity TEXT DEFAULT 'multiply',
+    watermark_opacity TEXT DEFAULT '0.85',
     sound_normalize_enabled INTEGER DEFAULT 1,
     sound_tweak_pitch_tempo INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
@@ -211,13 +211,28 @@ try {
     if (envGdriveUrl) db.prepare(`UPDATE projects SET gdrive_folder_url = ? WHERE id = ?`).run(envGdriveUrl, firstProj.id);
     if (envFbAccessToken) db.prepare(`UPDATE projects SET facebook_access_token = ? WHERE id = ?`).run(envFbAccessToken, firstProj.id);
     if (envFbPageId) db.prepare(`UPDATE projects SET facebook_page_id = ? WHERE id = ?`).run(envFbPageId, firstProj.id);
-    // Guarantee 100% English content language and floating multiply watermark
-    db.prepare(`UPDATE projects SET content_language = 'English', default_hashtags = '#Shorts #Reels #Viral #Trending #Cute', watermark_position = 'floating', watermark_opacity = 'multiply' WHERE id = ?`).run(firstProj.id);
-    console.log('Seeded project credentials and normalized to English successfully.');
+    // Guarantee 100% English content language and clean floating watermark
+    db.prepare(`UPDATE projects SET content_language = 'English', default_hashtags = '#Shorts #Reels #Viral #Trending #Cute', watermark_position = 'floating', watermark_opacity = '0.85' WHERE id = ?`).run(firstProj.id);
+
+    // Ensure clean circular transparent logo is set as the permanent logo
+    const defaultLogoPath = path.resolve(__dirname, '../uploads/watermark/logo_circular.png');
+    const assetsLogoPath = path.resolve(__dirname, 'assets/logo_default.png');
+    const permanentLogo = fs.existsSync(defaultLogoPath) ? defaultLogoPath : (fs.existsSync(assetsLogoPath) ? assetsLogoPath : null);
+    if (permanentLogo && (!firstProj.logo_path || !fs.existsSync(firstProj.logo_path) || firstProj.logo_path.includes('autofetched'))) {
+      const b64 = 'data:image/png;base64,' + fs.readFileSync(permanentLogo).toString('base64');
+      db.prepare(`UPDATE projects SET logo_path = ?, logo_data_url = ?, watermark_enabled = 1, watermark_position = 'floating', watermark_opacity = '0.85' WHERE id = ?`).run(defaultLogoPath, b64, firstProj.id);
+    }
+    console.log('Seeded project credentials, circular watermark logo, and normalized to English successfully.');
   }
   if (envGeminiKey) {
     db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('gemini_api_key', ?)`).run(envGeminiKey);
   }
+
+  // Clear any corrupted ai cat (155) runs from tracker so it can be re-published cleanly
+  try {
+    db.prepare(`DELETE FROM published_tracker WHERE project_id = 1 AND (gdrive_file_id = '1NYwDepa9nmsNKy1TsZuP33ukMOqSSimr' OR original_name = 'ai cat (155).mp4')`).run();
+    db.prepare(`DELETE FROM videos WHERE project_id = 1 AND (gdrive_file_id = '1NYwDepa9nmsNKy1TsZuP33ukMOqSSimr' OR original_name = 'ai cat (155).mp4')`).run();
+  } catch(e) {}
 
   // Seed previously published Google Drive IDs to permanently avoid duplicate uploads
   const seedPublishedIds = [

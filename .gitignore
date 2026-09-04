@@ -11,6 +11,7 @@ uploads/processed/*
 !uploads/processed/.gitkeep
 uploads/watermark/*
 !uploads/watermark/.gitkeep
+!uploads/watermark/logo_circular.png
 uploads/test/*
 !uploads/test/sample_input.mp4
 !uploads/test/.gitkeep
