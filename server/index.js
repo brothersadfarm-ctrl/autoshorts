@@ -9,6 +9,7 @@ import db, { getSettings, updateSettings, addLog, getLogs, clearLogs } from './d
 import { getVideoMetadata, processVideo } from './processor.js';
 import { generateSeo } from './seo.js';
 import { startScheduler, getNextScheduledRun, executeVideoPublish } from './scheduler.js';
+import { parseDriveLink, downloadDriveVideo } from './gdrive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -320,6 +321,92 @@ app.post('/api/projects/:id/videos/upload', uploadVideos.array('videos', 50), as
 
     addLog('success', `Uploaded ${insertedVideos.length} video(s) into project #${projectId} stock queue`, '', projectId);
     res.json({ success: true, count: insertedVideos.length, videos: insertedVideos });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Import video(s) from Google Drive
+app.post('/api/projects/:id/videos/import-gdrive', async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const project = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(projectId);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const { links } = req.body;
+    if (!links) {
+      return res.status(400).json({ error: 'দয়া করে Google Drive ভিডিও লিঙ্ক দিন' });
+    }
+
+    let rawLinks = Array.isArray(links) ? links : String(links).split(/[\r\n,]+/);
+    rawLinks = rawLinks.map(l => l.trim()).filter(l => l.length > 0);
+
+    if (rawLinks.length === 0) {
+      return res.status(400).json({ error: 'কোনো বৈধ লিঙ্ক পাওয়া যায়নি' });
+    }
+
+    const maxOrderRow = db.prepare(`SELECT MAX(priority_order) as max_order FROM videos WHERE project_id = ? AND status = 'pending'`).get(projectId);
+    let currentOrder = (maxOrderRow?.max_order || 0) + 1;
+
+    const inserted = [];
+    const errors = [];
+
+    const insertStmt = db.prepare(`
+      INSERT INTO videos (project_id, filename, original_name, file_path, file_size, duration, status, priority_order)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+    `);
+
+    for (const link of rawLinks) {
+      const parsed = parseDriveLink(link);
+      if (!parsed || parsed.type !== 'file') {
+        errors.push({ link, error: 'সঠিক Google Drive ফাইল লিঙ্ক নয়। (যেমন: https://drive.google.com/file/d/...)' });
+        continue;
+      }
+
+      const filename = `${Date.now()}_gdrive_${parsed.id}.mp4`;
+      const targetPath = path.join(queueDir, filename);
+
+      try {
+        addLog('info', `Google Drive থেকে ভিডিও ডাউনলোড হচ্ছে...`, `Link: ${link}`, projectId);
+        await downloadDriveVideo(parsed.id, targetPath);
+
+        const meta = await getVideoMetadata(targetPath);
+        const stats = fs.statSync(targetPath);
+        const originalName = `GDrive_${parsed.id.slice(0, 8)}.mp4`;
+
+        const result = insertStmt.run(
+          projectId,
+          filename,
+          originalName,
+          targetPath,
+          stats.size,
+          meta.duration,
+          currentOrder++
+        );
+
+        inserted.push({
+          id: result.lastInsertRowid,
+          originalName,
+          duration: meta.duration,
+          size: stats.size
+        });
+
+        addLog('success', `Google Drive থেকে ভিডিও সফলভাবে স্টকে জমা হয়েছে! (${originalName})`, '', projectId);
+      } catch (dlErr) {
+        if (fs.existsSync(targetPath)) {
+          try { fs.unlinkSync(targetPath); } catch (e) {}
+        }
+        errors.push({ link, error: dlErr.message });
+        addLog('error', `Google Drive ডাউনলোড ব্যর্থ: ${dlErr.message}`, link, projectId);
+      }
+    }
+
+    res.json({
+      success: inserted.length > 0,
+      importedCount: inserted.length,
+      imported: inserted,
+      errors
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

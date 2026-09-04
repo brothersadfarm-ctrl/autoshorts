@@ -1016,4 +1016,50 @@ async function clearActivityLogs() {
   }
 }
 
+// ======================== GOOGLE DRIVE VIDEO IMPORT ========================
+async function handleImportGoogleDrive() {
+  if (!currentProjectId) {
+    showToast('দয়া করে প্রথমে একটি চ্যানেল প্রজেক্ট সিলেক্ট করুন!', 'warn');
+    return;
+  }
+
+  const input = document.getElementById('gdrive-links-input');
+  const rawText = input.value.trim();
+  if (!rawText) {
+    showToast('দয়া করে অন্তত একটি Google Drive ভিডিও লিঙ্ক দিন', 'warn');
+    return;
+  }
+
+  const btn = document.getElementById('btn-import-gdrive');
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Google Drive থেকে ডাউনলোড হচ্ছে...`;
+
+  showToast('Google Drive থেকে ভিডিও ডাউনলোড ও স্টকে যুক্ত করা শুরু হয়েছে...', 'info');
+
+  try {
+    const res = await fetch(`/api/projects/${currentProjectId}/videos/import-gdrive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ links: rawText })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast(`অভিনন্দন! Google Drive থেকে ${data.importedCount}টি ভিডিও স্টকে যুক্ত হয়েছে!`, 'success');
+      input.value = '';
+      loadCurrentProjectVideos();
+      loadStatus();
+    } else {
+      const errMsg = data.errors && data.errors.length > 0 ? data.errors[0].error : (data.error || 'ইম্পোর্ট করা যায়নি');
+      showToast(`ত্রুটি: ${errMsg}`, 'error');
+    }
+  } catch (err) {
+    showToast(`ডাউনলোড ত্রুটি: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fa-brands fa-google-drive"></i><span>Google Drive থেকে স্টকে যুক্ত করুন</span>`;
+  }
+}
+
+
 

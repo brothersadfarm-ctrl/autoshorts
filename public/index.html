@@ -208,6 +208,36 @@
         </div>
       </div>
 
+      <!-- Google Drive Import Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-brands fa-google-drive text-amber-400 text-lg"></i>
+              Google Drive থেকে ভিডিও যুক্ত করুন (Cloud Link Import)
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              আপনার গুগল ড্রাইভে ভিডিও রেখে দিলে সেখান থেকে সাইট নিজে থেকেই ভিডিও ডাউনলোড করে লোগো ও সাউন্ড মডিফাই করবে। (একাধিক লিংক দিতে পারেন, প্রতি লাইনে একটি করে)।
+            </p>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <textarea id="gdrive-links-input" rows="3" placeholder="Google Drive ভিডিও শেয়ার লিংক পেস্ট করুন:&#10;https://drive.google.com/file/d/1A2B3C4D.../view?usp=sharing&#10;https://drive.google.com/file/d/5E6F7G8H.../view?usp=sharing" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-3 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none"></textarea>
+          
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <span class="text-[11px] text-slate-500">
+              <i class="fa-solid fa-circle-info text-indigo-400 mr-1"></i>
+              ড্রাইভে ভিডিওর Share সেটিংসে <b>"Anyone with the link can view"</b> দেওয়া থাকতে হবে।
+            </span>
+            <button type="button" id="btn-import-gdrive" onclick="handleImportGoogleDrive()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-lg shadow-amber-600/20 transition-all flex items-center gap-2">
+              <i class="fa-brands fa-google-drive"></i>
+              <span>Google Drive থেকে স্টকে যুক্ত করুন</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Pending Videos List -->
       <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
         <div class="flex items-center justify-between">
