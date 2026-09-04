@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import db, { getSettings, addLog } from './db.js';
+import db, { getSettings, addLog, isAlreadyPublished, recordPublishedVideo } from './db.js';
 import { processVideo, getVideoMetadata } from './processor.js';
 import { generateSeo } from './seo.js';
 import { publishToYouTube } from './publishers/youtube.js';
@@ -101,10 +101,18 @@ export const fetchNextVideoFromDrive = async (project) => {
       return null;
     }
 
-    // Get list of all file IDs or original names already recorded for this project
+    // Get list of all file IDs or original names already recorded or published for this project
     const existingVideos = db.prepare(`SELECT gdrive_file_id, original_name FROM videos WHERE project_id = ?`).all(project.id);
-    const existingIds = new Set(existingVideos.map(v => v.gdrive_file_id).filter(Boolean));
-    const existingNames = new Set(existingVideos.map(v => v.original_name).filter(Boolean));
+    const trackedPublished = db.prepare(`SELECT gdrive_file_id, original_name FROM published_tracker WHERE project_id = ?`).all(project.id);
+
+    const existingIds = new Set([
+      ...existingVideos.map(v => v.gdrive_file_id).filter(Boolean),
+      ...trackedPublished.map(v => v.gdrive_file_id).filter(Boolean)
+    ]);
+    const existingNames = new Set([
+      ...existingVideos.map(v => v.original_name).filter(Boolean),
+      ...trackedPublished.map(v => v.original_name).filter(Boolean)
+    ]);
 
     // Find first file not yet posted or queued
     const nextFile = files.find(f => !existingIds.has(f.id) && !existingNames.has(f.name));
@@ -200,6 +208,25 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
     const project = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(video.project_id);
     if (!project) {
       throw new Error(`Project #${video.project_id} not found`);
+    }
+
+    // STRICT DUPLICATE PREVENTION:
+    // Check if this video was EVER published on this channel
+    if (isAlreadyPublished({
+      projectId: video.project_id,
+      gdriveFileId: video.gdrive_file_id,
+      originalName: video.original_name,
+      fileSize: video.file_size
+    })) {
+      addLog('warn', `⚠️ ডুপ্লিকেট রোধ: "${video.original_name}" ইতিমধ্যে পূর্বে পাবলিশ করা হয়েছে! এটি বাদ দিয়ে পরবর্তী নতুন ভিডিও খোঁজা হচ্ছে...`, '', video.project_id);
+      db.prepare(`UPDATE videos SET status = 'duplicate_skipped', error_message = 'Already published previously' WHERE id = ?`).run(video.id);
+      try {
+        if (video.file_path && fs.existsSync(video.file_path)) fs.unlinkSync(video.file_path);
+      } catch (e) {}
+
+      // Automatically advance to the next unposted video
+      isCurrentlyProcessing = false;
+      return executeVideoPublish({ projectId: video.project_id, triggerSource: `${triggerSource} (Duplicate Skipped)` });
     }
 
     addLog('info', `🚀 Starting auto-publish pipeline for project "${project.name}" on video #${video.id} ("${video.original_name}")`, { triggerSource }, project.id);
@@ -304,6 +331,17 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
       errorMsg,
       video.id
     );
+
+    if (status === 'published') {
+      recordPublishedVideo({
+        projectId: project.id,
+        gdriveFileId: video.gdrive_file_id,
+        originalName: video.original_name,
+        fileSize: video.file_size,
+        youtubeVideoId: ytResult.videoId || null,
+        facebookPostId: fbResult.postId || null
+      });
+    }
 
     addLog('success', `🎉 Video #${video.id} workflow completed for "${project.name}"! Status: ${status}`, {
       title: seoData.title,

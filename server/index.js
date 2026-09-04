@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { DateTime } from 'luxon';
-import db, { getSettings, updateSettings, addLog, getLogs, clearLogs } from './db.js';
+import db, { getSettings, updateSettings, addLog, getLogs, clearLogs, isAlreadyPublished } from './db.js';
 import { getVideoMetadata, processVideo } from './processor.js';
 import { generateSeo } from './seo.js';
 import { startScheduler, getNextScheduledRun, executeVideoPublish, fetchNextVideoFromDrive } from './scheduler.js';
@@ -324,6 +324,12 @@ app.post('/api/projects/:id/videos/upload', uploadVideos.array('videos', 50), as
     let currentOrder = (maxOrderRow?.max_order || 0) + 1;
 
     for (const file of req.files) {
+      if (isAlreadyPublished({ projectId, originalName: file.originalname, fileSize: file.size })) {
+        try { fs.unlinkSync(file.path); } catch (e) {}
+        addLog('warn', `⚠️ ডুপ্লিকেট রোধ: "${file.originalname}" ইতিমধ্যে আগে পাবলিশ করা হয়েছে, আপলোড বাদ দেওয়া হলো!`, '', projectId);
+        continue;
+      }
+
       const meta = await getVideoMetadata(file.path);
       const result = insertStmt.run(
         projectId,
@@ -428,11 +434,16 @@ app.post('/api/projects/:id/videos/import-gdrive', async (req, res) => {
       let currentOrder = (maxOrderRow?.max_order || 0) + 1;
 
       const insertStmt = db.prepare(`
-        INSERT INTO videos (project_id, filename, original_name, file_path, file_size, duration, status, priority_order)
-        VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+        INSERT INTO videos (project_id, filename, original_name, file_path, file_size, duration, status, priority_order, gdrive_file_id)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
       `);
 
       for (const item of fileItems) {
+        if (isAlreadyPublished({ projectId, gdriveFileId: item.id, originalName: item.name })) {
+          addLog('warn', `⚠️ ডুপ্লিকেট রোধ: "${item.name || item.id}" ইতিমধ্যে পূর্বে পাবলিশ করা হয়েছে, ডাউনলোড বাদ দেওয়া হলো!`, item.link, projectId);
+          continue;
+        }
+
         const filename = `${Date.now()}_gdrive_${item.id}.mp4`;
         const targetPath = path.join(queueDir, filename);
 
@@ -451,7 +462,8 @@ app.post('/api/projects/:id/videos/import-gdrive', async (req, res) => {
             targetPath,
             stats.size,
             meta.duration,
-            currentOrder++
+            currentOrder++,
+            item.id
           );
 
           addLog('success', `Google Drive থেকে ভিডিও সফলভাবে স্টকে জমা হয়েছে! (${originalName})`, '', projectId);

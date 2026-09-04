@@ -90,6 +90,19 @@ db.exec(`
     details TEXT,
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
   );
+
+  -- Permanent Published Video Ledger (Never deleted, guarantees 0 duplicates)
+  CREATE TABLE IF NOT EXISTS published_tracker (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER,
+    gdrive_file_id TEXT,
+    original_name TEXT,
+    file_size INTEGER,
+    file_hash TEXT,
+    youtube_video_id TEXT,
+    facebook_post_id TEXT,
+    published_at TEXT DEFAULT (datetime('now', 'localtime'))
+  );
 `);
 
 try {
@@ -221,6 +234,63 @@ export const clearLogs = (projectId = null) => {
     db.prepare(`DELETE FROM logs WHERE project_id = ?`).run(projectId);
   } else {
     db.prepare(`DELETE FROM logs`).run();
+  }
+};
+
+/**
+ * Checks if a video has ALREADY been published on this channel
+ */
+export const isAlreadyPublished = ({ projectId, gdriveFileId, originalName, fileSize, fileHash }) => {
+  try {
+    // 1. Check permanent published_tracker ledger
+    if (gdriveFileId) {
+      const match = db.prepare(`SELECT id FROM published_tracker WHERE project_id = ? AND gdrive_file_id = ?`).get(projectId, gdriveFileId);
+      if (match) return true;
+    }
+    if (fileHash) {
+      const match = db.prepare(`SELECT id FROM published_tracker WHERE project_id = ? AND file_hash = ?`).get(projectId, fileHash);
+      if (match) return true;
+    }
+    if (originalName && fileSize) {
+      const match = db.prepare(`SELECT id FROM published_tracker WHERE project_id = ? AND original_name = ? AND file_size = ?`).get(projectId, originalName, fileSize);
+      if (match) return true;
+    }
+
+    // 2. Check videos table (status = 'published')
+    if (gdriveFileId) {
+      const match = db.prepare(`SELECT id FROM videos WHERE project_id = ? AND gdrive_file_id = ? AND status = 'published'`).get(projectId, gdriveFileId);
+      if (match) return true;
+    }
+    if (originalName && fileSize) {
+      const match = db.prepare(`SELECT id FROM videos WHERE project_id = ? AND original_name = ? AND file_size = ? AND status = 'published'`).get(projectId, originalName, fileSize);
+      if (match) return true;
+    }
+    return false;
+  } catch (e) {
+    console.error('isAlreadyPublished error:', e);
+    return false;
+  }
+};
+
+/**
+ * Permanently records a successfully published video
+ */
+export const recordPublishedVideo = ({ projectId, gdriveFileId, originalName, fileSize, fileHash, youtubeVideoId, facebookPostId }) => {
+  try {
+    db.prepare(`
+      INSERT INTO published_tracker (project_id, gdrive_file_id, original_name, file_size, file_hash, youtube_video_id, facebook_post_id, published_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+    `).run(
+      projectId,
+      gdriveFileId || null,
+      originalName || null,
+      fileSize || 0,
+      fileHash || null,
+      youtubeVideoId || null,
+      facebookPostId || null
+    );
+  } catch (e) {
+    console.error('recordPublishedVideo error:', e);
   }
 };
 
