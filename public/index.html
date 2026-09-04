@@ -396,7 +396,8 @@
             <div>
               <label class="block text-xs font-semibold text-slate-300 mb-1">ওয়াটারমার্কের অবস্থান (Position)</label>
               <select id="setting-wm-position" onchange="autoSaveCurrentProject()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-                <option value="top-right">উপরে ডানে (Top-Right)</option>
+                <option value="floating">🌊 ভাসমান মুভমেন্ট (ধীরে ধীরে চারিদিকে ঘুরবে - Anti-Theft)</option>
+                <option value="top-right" selected>উপরে ডানে (Top-Right - স্বাভাবিক)</option>
                 <option value="top-left">উপরে বামে (Top-Left)</option>
                 <option value="bottom-right">নিচে ডানে (Bottom-Right)</option>
                 <option value="bottom-left">নিচে বামে (Bottom-Left)</option>
@@ -405,12 +406,12 @@
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">স্বচ্ছতা (Opacity)</label>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">স্বচ্ছতা ও ব্লেন্ড (Opacity / Blend)</label>
               <select id="setting-wm-opacity" onchange="autoSaveCurrentProject()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-                <option value="1.0">100% (সম্পূর্ণ স্পষ্ট)</option>
-                <option value="0.85" selected>85% (হালকা স্বচ্ছ - আদর্শ)</option>
-                <option value="0.70">70%</option>
-                <option value="0.50">50%</option>
+                <option value="0.70" selected>৭০% (প্রফেশনাল ব্লেন্ড - আলগা মনে হবে না - রিকমেন্ডেড)</option>
+                <option value="0.55">৫৫% (সফট ওয়াটারমার্ক ব্লেন্ড)</option>
+                <option value="0.85">৮৫% (স্বাভাবিক স্পষ্ট)</option>
+                <option value="1.0">১০০% (সম্পূর্ণ স্পষ্ট)</option>
               </select>
             </div>
           </div>

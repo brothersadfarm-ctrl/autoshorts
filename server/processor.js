@@ -109,36 +109,55 @@ export const processVideo = async (inputPath, outputPath, options = {}) => {
 
     // 2. Watermark overlay filter
     if (hasWatermark) {
-      // Calculate position
-      let overlayPos = 'main_w-overlay_w-24:24'; // top-right default
+      // Calculate dynamic or fixed position
+      let overlayX = 'main_w-overlay_w-28';
+      let overlayY = '28';
+
       switch (watermarkPosition) {
         case 'top-left':
-          overlayPos = '24:24';
+          overlayX = '28';
+          overlayY = '28';
           break;
         case 'top-right':
-          overlayPos = 'main_w-overlay_w-24:24';
+          overlayX = 'main_w-overlay_w-28';
+          overlayY = '28';
           break;
         case 'bottom-left':
-          overlayPos = '24:main_h-overlay_h-36';
+          overlayX = '28';
+          overlayY = 'main_h-overlay_h-40';
           break;
         case 'bottom-right':
-          overlayPos = 'main_w-overlay_w-24:main_h-overlay_h-36';
+          overlayX = 'main_w-overlay_w-28';
+          overlayY = 'main_h-overlay_h-40';
           break;
         case 'center':
-          overlayPos = '(main_w-overlay_w)/2:(main_h-overlay_h)/2';
+          overlayX = '(main_w-overlay_w)/2';
+          overlayY = '(main_h-overlay_h)/2';
+          break;
+        case 'floating':
+        case 'floating-smooth':
+          // Smooth slow floating across all directions (gentle 35-40s loop, anti-theft)
+          overlayX = '(main_w-overlay_w)/2+((main_w-overlay_w)*0.38)*sin(t*0.25)';
+          overlayY = '(main_h-overlay_h)/2+((main_h-overlay_h)*0.35)*cos(t*0.2)';
+          break;
+        case 'floating-corners':
+          // Slow drifting between 4 corners
+          overlayX = '(main_w-overlay_w)/2+((main_w-overlay_w)*0.42)*sin(t*0.14)';
+          overlayY = '(main_h-overlay_h)/2+((main_h-overlay_h)*0.42)*cos(t*0.16)';
           break;
       }
 
-      // Watermark sizing & opacity
-      // Watermark width relative to main video (e.g. 15%-20%)
-      const scalePercent = Math.max(0.05, Math.min(0.5, parseFloat(watermarkScale) || 0.16));
-      const opacity = Math.max(0.1, Math.min(1.0, parseFloat(watermarkOpacity) || 0.85));
+      // Standard natural watermark sizing (~12% to 14% of video width, ~140px on 1080p)
+      const scalePercent = Math.max(0.08, Math.min(0.25, parseFloat(watermarkScale) || 0.13));
+      const targetWidth = Math.round((meta.width || 1080) * scalePercent);
+      const opacity = Math.max(0.1, Math.min(1.0, parseFloat(watermarkOpacity) || 0.75));
 
+      // Natural alpha blend so the watermark integrates seamlessly with video textures
       filterComplexParts.push(
-        `[1:v]scale=iw*${scalePercent * 2}:-1,format=rgba,colorchannelmixer=aa=${opacity}[wm]`
+        `[1:v]scale=${targetWidth}:-1,format=rgba,colorchannelmixer=aa=${opacity}[wm]`
       );
       filterComplexParts.push(
-        `${currentVideoStream}[wm]overlay=${overlayPos}[v_out]`
+        `${currentVideoStream}[wm]overlay=x=${overlayX}:y=${overlayY}[v_out]`
       );
       currentVideoStream = '[v_out]';
     }
