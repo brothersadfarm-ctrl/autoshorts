@@ -27,31 +27,34 @@ export const generateSeo = async (videoInfo, settings) => {
     .trim();
   const customPrompt = settings.seo_prompt_custom || '';
 
-  // Clean filename for context
+  // Clean filename for context (remove extension, numbers, and brackets)
   const cleanName = (originalName || 'viral_short')
     .replace(/\.[^/.]+$/, '') // remove extension
+    .replace(/\(\d+\)/g, '')   // remove numbers in parentheses like (155)
+    .replace(/\b\d+\b/g, '')   // remove standalone numbers
     .replace(/[_-]+/g, ' ')   // replace dashes/underscores with space
+    .replace(/\s+/g, ' ')
     .trim();
 
-  // 1. Extract visual frame from video for deep multi-modal content understanding
-  let frameBase64 = null;
+  // 1. Extract multiple visual frames across the video for deep multi-modal content understanding
+  const framesBase64 = [];
   if (videoPath && fs.existsSync(videoPath)) {
     try {
-      const tempFramePath = path.join(os.tmpdir(), `seo_thumb_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.jpg`);
-      await new Promise((resolve) => {
-        execFile('ffmpeg', ['-y', '-ss', '00:00:02', '-i', videoPath, '-vframes', '1', '-q:v', '2', tempFramePath], (err) => {
-          if (err || !fs.existsSync(tempFramePath)) {
-            execFile('ffmpeg', ['-y', '-i', videoPath, '-vframes', '1', '-q:v', '2', tempFramePath], () => resolve());
-          } else {
+      const timestamps = ['00:00:01', '00:00:03', '00:00:06'];
+      for (let i = 0; i < timestamps.length; i++) {
+        const tempFramePath = path.join(os.tmpdir(), `seo_thumb_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}.jpg`);
+        await new Promise((resolve) => {
+          execFile('ffmpeg', ['-y', '-ss', timestamps[i], '-i', videoPath, '-vframes', '1', '-q:v', '2', tempFramePath], (err) => {
             resolve();
-          }
+          });
         });
-      });
-
-      if (fs.existsSync(tempFramePath) && fs.statSync(tempFramePath).size > 0) {
-        frameBase64 = fs.readFileSync(tempFramePath).toString('base64');
-        try { fs.unlinkSync(tempFramePath); } catch (e) {}
-        addLog('info', `Video frame extracted successfully for Gemini Vision analysis (${cleanName})`);
+        if (fs.existsSync(tempFramePath) && fs.statSync(tempFramePath).size > 0) {
+          framesBase64.push(fs.readFileSync(tempFramePath).toString('base64'));
+          try { fs.unlinkSync(tempFramePath); } catch (e) {}
+        }
+      }
+      if (framesBase64.length > 0) {
+        addLog('info', `Video frames (${framesBase64.length}) extracted successfully for Gemini Vision analysis (${cleanName})`);
       }
     } catch (frameErr) {
       console.log('Frame extraction notice:', frameErr.message);
@@ -61,21 +64,23 @@ export const generateSeo = async (videoInfo, settings) => {
   // If Gemini API Key is available, call Gemini API
   if (apiKey) {
     try {
-      addLog('info', `Calling Gemini AI for SEO optimization on: "${cleanName}" ${frameBase64 ? '(with visual frame analysis)' : ''}`);
+      addLog('info', `Calling Gemini AI for SEO optimization on: "${cleanName}" ${framesBase64.length > 0 ? `(with ${framesBase64.length} visual frames analyzed)` : ''}`);
 
       const prompt = `
 You are an elite YouTube Shorts & Facebook Reels growth hacker, viral algorithm expert, and content strategist.
 
-${frameBase64 ? `
-VISUAL ANALYSIS TASK:
-Look closely at the attached video frame:
-1. Identify the exact character / animal / subject, clothing, tools/props, facial expression, and what they are doing.
-2. Identify the setting, environment, background, and mood.
-3. Formulate the title, hook, and caption to match PRECISELY what is visually happening in the video!
+${framesBase64.length > 0 ? `
+DEEP VISUAL SCENE ANALYSIS:
+Look closely at the attached video frames showing the chronological action:
+1. Examine the characters, their costumes/armor, weapons/props, funny expressions, and unexpected actions.
+2. Identify what makes this scene funny, epic, cute, or dramatic.
+3. STRICT ANTI-FILENAME RULE: NEVER use boring raw filenames, numbers, or serial codes like "(155)", "(156)", "ai cat (155)" in the title or captions!
+4. Craft an original, viral human-like title based 100% on the visual story (e.g. "When the Village Cats Declare War! 😼⚔️ #Shorts" or "He Thought He Was the Master of Stealth! 😹 #Shorts").
 ` : `
 CONTENT CONTEXT:
 - Video Topic: "${cleanName}"
 ${customNotes ? `- Creator Notes: "${customNotes}"` : ''}
+- STRICT RULE: Do NOT include numbers or brackets in titles or captions.
 `}
 - Channel Niche: ${niche}
 ${customPrompt ? `- Additional Guidance: "${customPrompt}"` : ''}
@@ -89,9 +94,9 @@ GENERATE TWO SEPARATE PLATFORM PROFILES IN 100% ENGLISH:
 
 === PLATFORM 1: YOUTUBE SHORTS (100% ENGLISH) ===
 - Algorithm goal: Extremely high Click-Through Rate (CTR) + Search SEO ranking.
-- Title: Under 85 characters. Irresistible curiosity loop or emotional hook directly describing the visual action (e.g. "Hardest Working Cat in the World! 😼🏍️ #Shorts"). 1-2 emojis. MUST end with #Shorts.
+- Title: Under 80 characters. High curiosity loop directly describing the visual action/comedy (e.g. "When the Boss Cat Loses His Patience! 😼🔥 #Shorts"). 1-2 emojis. MUST end with #Shorts. NEVER use filenames or numbers!
 - Description:
-  1. Compelling 2-3 line story hook summarizing what happens in the video in fluent English.
+  1. Compelling 2-3 line story hook summarizing the funny visual action in fluent English.
   2. Call to Action (CTA) to Subscribe & turn on notifications.
   3. "Search Keywords:" section containing 6-8 high-volume, highly relevant English search queries.
   4. 3-5 YouTube hashtags (including #Shorts, #YouTubeShorts).
@@ -103,14 +108,14 @@ GENERATE TWO SEPARATE PLATFORM PROFILES IN 100% ENGLISH:
 - Caption (Facebook Reels only has a Caption, not a separate title):
   1. Hook Line (Above the fold): Catchy, emotional question or hilarious observation directly related to the visual action in the video.
   2. Relatable Body: 1-2 short sentences making the viewer laugh, smile, or feel amazed.
-  3. Viral Engagement Trigger: Ask viewers a compelling question or tell them to comment/tag a friend (e.g. "What do you think he is delivering? Let me know below! 👇🐾 Share this with a cat lover!").
+  3. Viral Engagement Trigger: Ask viewers a compelling question or tell them to comment/tag a friend (e.g. "Who has a cat that acts just like this? Tag them below! 👇🐾").
   4. Facebook Hashtags: 4-6 targeted Facebook hashtags (e.g. #reels #reelsfb #facebookreels #viralreels #catlovers #reelsvideo).
 
 Respond ONLY with a valid JSON object matching this exact schema:
 {
   "visual_breakdown": "1-2 sentence description of the character, action, and setting",
   "youtube": {
-    "title": "Viral YouTube Shorts Title in English (<85 chars, with emojis and #Shorts)",
+    "title": "Viral YouTube Shorts Title in English (<80 chars, with emojis and #Shorts, NO numbers)",
     "description": "Algorithmic YouTube description in English with scene story, CTA, keywords, and hashtags",
     "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
     "hashtags": "#Shorts #YouTubeShorts #viral #trending"
@@ -128,8 +133,8 @@ Respond ONLY with a valid JSON object matching this exact schema:
       for (const model of modelsToTry) {
         try {
           const parts = [{ text: prompt }];
-          if (frameBase64) {
-            parts.push({ inlineData: { mimeType: 'image/jpeg', data: frameBase64 } });
+          for (const fb64 of framesBase64) {
+            parts.push({ inlineData: { mimeType: 'image/jpeg', data: fb64 } });
           }
 
           const response = await axios.post(
@@ -146,7 +151,7 @@ Respond ONLY with a valid JSON object matching this exact schema:
           );
           candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
           if (candidateText) {
-            addLog('info', `Gemini AI SEO generated using model: ${model} ${frameBase64 ? '(Visual Frame Analyzed)' : ''}`);
+            addLog('info', `Gemini AI SEO generated using model: ${model} (${framesBase64.length} Visual Frames Analyzed)`);
             break;
           }
         } catch (mErr) {
@@ -219,12 +224,16 @@ Respond ONLY with a valid JSON object matching this exact schema:
  * Intelligent Fallback SEO when Gemini is offline or not configured
  */
 export const generateFallbackSeo = (cleanName, niche, defaultHashtags) => {
-  // Capitalize words
-  const titleWords = cleanName
+  // Capitalize words & ensure no numbers/brackets remain
+  let titleWords = cleanName
+    .replace(/\(\d+\)/g, '')
+    .replace(/\b\d+\b/g, '')
     .split(' ')
     .filter(w => w.length > 0)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ');
+    .join(' ')
+    .trim();
+  if (!titleWords || titleWords.length < 3) titleWords = 'Epic Viral Cat Adventure';
 
   const ytTitleTemplates = [
     `🔥 ${titleWords} | You Won't Believe This! #Shorts`,

@@ -298,14 +298,13 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
         watermarkEnabled: project.watermark_enabled === 1 && !!watermarkPath,
         watermarkPath,
         watermarkPosition: project.watermark_position || 'top-right',
-        watermarkScale: project.watermark_scale || 0.16,
-        watermarkOpacity: project.watermark_opacity || 0.85,
+        watermarkOpacity: project.watermark_opacity || 0.15,
         soundNormalizeEnabled: project.sound_normalize_enabled === 1,
         soundTweakEnabled: project.sound_tweak_pitch_tempo === 1
       });
     }
 
-    // 2. AI SEO Generation with Visual Frame Analysis & 100% English Setting
+    // 2. AI SEO Generation with Multi-Frame Visual Analysis & 100% English Setting
     const seoSettings = {
       gemini_api_key: globalSettings.gemini_api_key,
       channel_niche: project.niche || 'Viral Facts & Entertainment',
