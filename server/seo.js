@@ -44,33 +44,55 @@ Respond ONLY with a valid JSON object matching this exact schema (no markdown, n
 }
 `;
 
-      // Try gemini-2.0-flash or gemini-1.5-flash
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000
-          }
-        },
-        { timeout: 15000 }
-      );
+      // Try gemini-3.5-flash, gemini-2.5-flash, or gemini-flash-latest
+      const modelsToTry = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+      let candidateText = '';
 
-      const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      for (const model of modelsToTry) {
+        try {
+          const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.7,
+                responseMimeType: "application/json",
+                maxOutputTokens: 2500
+              }
+            },
+            { timeout: 20000 }
+          );
+          candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (candidateText) {
+            addLog('info', `Gemini AI SEO generated using model: ${model}`);
+            break;
+          }
+        } catch (mErr) {
+          console.log(`Model ${model} failed, trying next fallback:`, mErr.message);
+        }
+      }
+
       // Parse JSON from text
-      const jsonMatch = candidateText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.title) {
-          addLog('success', `Gemini AI generated viral SEO title: "${parsed.title}"`);
-          return {
-            title: parsed.title,
-            description: `${parsed.description}\n\n${parsed.hashtags || defaultHashtags}`,
-            tags: Array.isArray(parsed.tags) ? parsed.tags.join(', ') : (parsed.tags || 'shorts, reels, viral'),
-            hashtags: parsed.hashtags || defaultHashtags,
-            aiGenerated: true
-          };
+      if (candidateText) {
+        let jsonStr = candidateText.trim();
+        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonStr = jsonMatch[0];
+        }
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed && parsed.title) {
+            addLog('success', `Gemini AI generated viral SEO title: "${parsed.title}"`);
+            return {
+              title: parsed.title,
+              description: `${parsed.description || ''}\n\n${parsed.hashtags || defaultHashtags}`.trim(),
+              tags: Array.isArray(parsed.tags) ? parsed.tags.join(', ') : (parsed.tags || 'shorts, reels, viral'),
+              hashtags: parsed.hashtags || defaultHashtags,
+              aiGenerated: true
+            };
+          }
+        } catch (jsonErr) {
+          console.log('JSON parse error from Gemini text:', jsonErr.message);
         }
       }
     } catch (err) {
