@@ -136,9 +136,10 @@ export const processVideo = async (inputPath, outputPath, options = {}) => {
           break;
         case 'floating':
         case 'floating-smooth':
-          // Smooth slow floating across all directions (gentle 35-40s loop, anti-theft)
-          overlayX = '(main_w-overlay_w)/2+((main_w-overlay_w)*0.38)*sin(t*0.25)';
-          overlayY = '(main_h-overlay_h)/2+((main_h-overlay_h)*0.35)*cos(t*0.2)';
+        default:
+          // Smooth slow floating movement around all 4 sides of the video (anti-theft perimeter motion)
+          overlayX = '(main_w-overlay_w)/2+((main_w-overlay_w)*0.40)*sin(t*0.35)';
+          overlayY = '(main_h-overlay_h)/2+((main_h-overlay_h)*0.42)*cos(t*0.25)';
           break;
         case 'floating-corners':
           // Slow drifting between 4 corners
@@ -147,19 +148,31 @@ export const processVideo = async (inputPath, outputPath, options = {}) => {
           break;
       }
 
-      // Standard natural watermark sizing (~12% to 14% of video width, ~140px on 1080p)
-      const scalePercent = Math.max(0.08, Math.min(0.25, parseFloat(watermarkScale) || 0.13));
+      // Sizing (~14% to 18% of video width)
+      const scalePercent = Math.max(0.08, Math.min(0.25, parseFloat(watermarkScale) || 0.16));
       const targetWidth = Math.round((meta.width || 1080) * scalePercent);
-      const opacity = Math.max(0.1, Math.min(1.0, parseFloat(watermarkOpacity) || 0.75));
 
-      // Natural alpha blend so the watermark integrates seamlessly with video textures
-      filterComplexParts.push(
-        `[1:v]scale=${targetWidth}:-1,format=rgba,colorchannelmixer=aa=${opacity}[wm]`
-      );
-      filterComplexParts.push(
-        `${currentVideoStream}[wm]overlay=x=${overlayX}:y=${overlayY}[v_out]`
-      );
-      currentVideoStream = '[v_out]';
+      const isMultiply = String(watermarkOpacity).toLowerCase().includes('multiply') || options.watermarkBlend === 'multiply';
+      const opacity = isMultiply ? 0.88 : Math.max(0.1, Math.min(1.0, parseFloat(watermarkOpacity) || 0.85));
+
+      if (isMultiply) {
+        // Multiply blend mode: overlay onto white canvas and multiply blend into video
+        // White * Video = Video, so canvas is 100% transparent and logo pixels multiply into video
+        filterComplexParts.push(`[1:v]scale=${targetWidth}:-1[wm_raw]`);
+        filterComplexParts.push(`color=c=white:s=${meta.width || 1080}x${meta.height || 1920}:d=${Math.ceil(meta.duration || 60)}[wm_canvas]`);
+        filterComplexParts.push(`[wm_canvas][wm_raw]overlay=x='${overlayX}':y='${overlayY}':shortest=1[wm_layer]`);
+        filterComplexParts.push(`${currentVideoStream}[wm_layer]blend=all_mode=multiply:all_opacity=${opacity}[v_out]`);
+        currentVideoStream = '[v_out]';
+      } else {
+        // Natural transparent overlay with colorkey removal of white background box
+        filterComplexParts.push(
+          `[1:v]scale=${targetWidth}:-1,format=rgba,colorkey=0xffffff:0.25:0.1,colorchannelmixer=aa=${opacity}[wm]`
+        );
+        filterComplexParts.push(
+          `${currentVideoStream}[wm]overlay=x='${overlayX}':y='${overlayY}':shortest=1[v_out]`
+        );
+        currentVideoStream = '[v_out]';
+      }
     }
 
     // 3. Audio filters

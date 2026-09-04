@@ -206,9 +206,8 @@ async function switchProject(projectId) {
     }).catch(e => console.error('Failed to sync restored credentials:', e));
   }
 
-  // Populate Channel Settings Form
-  document.getElementById('setting-wm-position').value = currentProject.watermark_position || 'top-right';
-  document.getElementById('setting-wm-opacity').value = String(currentProject.watermark_opacity || 0.85);
+  document.getElementById('setting-wm-position').value = currentProject.watermark_position || 'floating';
+  document.getElementById('setting-wm-opacity').value = String(currentProject.watermark_opacity || 'multiply');
   document.getElementById('setting-sound-norm').checked = currentProject.sound_normalize_enabled === 1;
   document.getElementById('setting-sound-tweak').checked = currentProject.sound_tweak_pitch_tempo === 1;
   document.getElementById('setting-pub-yt').checked = currentProject.publish_youtube === 1;

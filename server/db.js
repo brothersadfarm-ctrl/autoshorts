@@ -38,9 +38,9 @@ db.exec(`
     facebook_access_token TEXT DEFAULT '',
     facebook_page_id TEXT DEFAULT '',
     watermark_enabled INTEGER DEFAULT 1,
-    watermark_position TEXT DEFAULT 'top-right',
+    watermark_position TEXT DEFAULT 'floating',
     watermark_scale REAL DEFAULT 0.16,
-    watermark_opacity REAL DEFAULT 0.85,
+    watermark_opacity TEXT DEFAULT 'multiply',
     sound_normalize_enabled INTEGER DEFAULT 1,
     sound_tweak_pitch_tempo INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
@@ -211,8 +211,8 @@ try {
     if (envGdriveUrl) db.prepare(`UPDATE projects SET gdrive_folder_url = ? WHERE id = ?`).run(envGdriveUrl, firstProj.id);
     if (envFbAccessToken) db.prepare(`UPDATE projects SET facebook_access_token = ? WHERE id = ?`).run(envFbAccessToken, firstProj.id);
     if (envFbPageId) db.prepare(`UPDATE projects SET facebook_page_id = ? WHERE id = ?`).run(envFbPageId, firstProj.id);
-    // Guarantee 100% English content language
-    db.prepare(`UPDATE projects SET content_language = 'English', default_hashtags = '#Shorts #Reels #Viral #Trending #Cute' WHERE id = ?`).run(firstProj.id);
+    // Guarantee 100% English content language and floating multiply watermark
+    db.prepare(`UPDATE projects SET content_language = 'English', default_hashtags = '#Shorts #Reels #Viral #Trending #Cute', watermark_position = 'floating', watermark_opacity = 'multiply' WHERE id = ?`).run(firstProj.id);
     console.log('Seeded project credentials and normalized to English successfully.');
   }
   if (envGeminiKey) {
@@ -222,7 +222,8 @@ try {
   // Seed previously published Google Drive IDs to permanently avoid duplicate uploads
   const seedPublishedIds = [
     { gdriveId: '1QjVX5Ol2_TH8dWnqdppX_y4u_MbEJhOt', name: 'ai cat (1).mp4' },
-    { gdriveId: '1XJEdRqcAhnXD0qoN4AlocRzG9Q4vtgdT', name: 'ai cat (153).mp4' }
+    { gdriveId: '1XJEdRqcAhnXD0qoN4AlocRzG9Q4vtgdT', name: 'ai cat (153).mp4' },
+    { gdriveId: '19IMMFPnq9RznYxdliVRQXhbZC4mejkWn', name: 'ai cat (154).mp4' }
   ];
   for (const item of seedPublishedIds) {
     try {
