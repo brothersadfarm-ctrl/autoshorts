@@ -688,20 +688,26 @@ app.post('/api/settings', (req, res) => {
 // 1-Click Google OAuth Login URL
 app.get('/api/auth/google/login', async (req, res) => {
   try {
-    const projectId = parseInt(req.query.projectId);
-    const project = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(projectId);
+    const projectId = parseInt(req.query.projectId) || 1;
+    let project = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(projectId);
     if (!project) return res.status(404).send('Project not found');
 
-    const clientId = project.youtube_client_id?.trim();
-    const clientSecret = project.youtube_client_secret?.trim();
+    const clientId = (req.query.clientId || project.youtube_client_id || '').trim();
+    const clientSecret = (req.query.clientSecret || project.youtube_client_secret || '').trim();
 
     if (!clientId || !clientSecret) {
       return res.status(400).send('YouTube Client ID এবং Client Secret আগে সেভ করুন!');
     }
 
+    // Immediately save to DB
+    db.prepare(`UPDATE projects SET youtube_client_id = ?, youtube_client_secret = ? WHERE id = ?`).run(clientId, clientSecret, projectId);
+
     const { google } = await import('googleapis');
     const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
     const redirectUri = `${proto}://${req.get('host')}/api/auth/google/callback`;
+
+    // Encode state with projectId, clientId, clientSecret to survive any container restarts
+    const statePayload = Buffer.from(JSON.stringify({ projectId, clientId, clientSecret })).toString('base64');
 
     const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
     const authUrl = oauth2Client.generateAuthUrl({
@@ -711,7 +717,7 @@ app.get('/api/auth/google/login', async (req, res) => {
         'https://www.googleapis.com/auth/youtube.upload',
         'https://www.googleapis.com/auth/youtube.readonly'
       ],
-      state: String(projectId)
+      state: statePayload
     });
 
     res.redirect(authUrl);
@@ -723,26 +729,58 @@ app.get('/api/auth/google/login', async (req, res) => {
 // Google OAuth Callback Handler
 app.get('/api/auth/google/callback', async (req, res) => {
   try {
-    const { code, state: projectId } = req.query;
+    const { code, state, error, error_description } = req.query;
+
+    if (error) {
+      return res.status(400).send(`Google Login Error: ${error} - ${error_description || ''}`);
+    }
+
     if (!code) return res.status(400).send('Authorization code not provided');
 
+    // Decode state
+    let projectId = 1;
+    let clientId = '';
+    let clientSecret = '';
+
+    if (state) {
+      try {
+        const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+        projectId = parseInt(decoded.projectId) || 1;
+        clientId = (decoded.clientId || '').trim();
+        clientSecret = (decoded.clientSecret || '').trim();
+      } catch (e) {
+        projectId = parseInt(state) || 1;
+      }
+    }
+
     const project = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(projectId);
-    if (!project) return res.status(404).send('Project not found');
+    if (!clientId && project) clientId = project.youtube_client_id?.trim();
+    if (!clientSecret && project) clientSecret = project.youtube_client_secret?.trim();
+
+    if (!clientId || !clientSecret) {
+      return res.status(400).send('OAuth Callback Error: Client ID বা Client Secret পাওয়া যায়নি।');
+    }
 
     const { google } = await import('googleapis');
     const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
     const redirectUri = `${proto}://${req.get('host')}/api/auth/google/callback`;
 
     const oauth2Client = new google.auth.OAuth2(
-      project.youtube_client_id.trim(),
-      project.youtube_client_secret.trim(),
+      clientId,
+      clientSecret,
       redirectUri
     );
 
     const { tokens } = await oauth2Client.getToken(code);
     if (tokens.refresh_token) {
-      db.prepare(`UPDATE projects SET youtube_refresh_token = ? WHERE id = ?`).run(tokens.refresh_token, projectId);
-      addLog('success', `YouTube 1-Click OAuth completed for project "${project.name}"! Refresh token saved.`, '', projectId);
+      db.prepare(`
+        UPDATE projects 
+        SET youtube_refresh_token = ?,
+            youtube_client_id = ?,
+            youtube_client_secret = ?
+        WHERE id = ?
+      `).run(tokens.refresh_token, clientId, clientSecret, projectId);
+      addLog('success', `YouTube 1-Click OAuth completed for project "${project?.name || projectId}"! Refresh token saved.`, '', projectId);
     } else {
       addLog('warn', `OAuth completed but Google did not return a new refresh token (already authorized).`, '', projectId);
     }

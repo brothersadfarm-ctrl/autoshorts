@@ -1083,15 +1083,16 @@ window.addEventListener('message', async (event) => {
 
 async function loginWithGoogleOAuth() {
   if (!currentProjectId) return;
-  await saveProjectSettingsFull(); // save input values first
   const clientId = document.getElementById('setting-yt-client-id').value.trim();
   const clientSecret = document.getElementById('setting-yt-client-secret').value.trim();
   if (!clientId || !clientSecret) {
     showToast('দয়া করে প্রথমে Client ID এবং Client Secret বক্সে লিখুন!', 'warn');
     return;
   }
-  // Open OAuth popup
-  window.open(`/api/auth/google/login?projectId=${currentProjectId}`, '_blank', 'width=600,height=700');
+  await saveProjectSettingsFull(); // save input values first
+  // Open OAuth popup with credentials explicitly passed
+  const url = `/api/auth/google/login?projectId=${currentProjectId}&clientId=${encodeURIComponent(clientId)}&clientSecret=${encodeURIComponent(clientSecret)}`;
+  window.open(url, '_blank', 'width=600,height=700');
 }
 
 async function testYouTubeConnection() {
