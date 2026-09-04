@@ -64,13 +64,16 @@ export const publishToFacebook = async (videoPath, seoData, settings) => {
     addLog('info', `Facebook Reel session started. Video ID: ${videoId}. Uploading binary...`);
 
     // 2. Upload video binary data
-    const videoStream = fs.createReadStream(videoPath);
-    await axios.post(uploadUrl, videoStream, {
+    const fileBuffer = fs.readFileSync(videoPath);
+    await axios.post(uploadUrl, fileBuffer, {
       headers: {
         'Authorization': `OAuth ${pageToken}`,
         'offset': '0',
         'file_size': String(fileSize),
-        'Content-Type': 'application/octet-stream'
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(fileSize),
+        'X-Entity-Length': String(fileSize),
+        'X-Entity-Type': 'video/mp4'
       },
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
