@@ -15,6 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.enable('trust proxy');
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
@@ -672,7 +673,8 @@ app.get('/api/auth/google/login', async (req, res) => {
     }
 
     const { google } = await import('googleapis');
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+    const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+    const redirectUri = `${proto}://${req.get('host')}/api/auth/google/callback`;
 
     const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
     const authUrl = oauth2Client.generateAuthUrl({
@@ -701,7 +703,8 @@ app.get('/api/auth/google/callback', async (req, res) => {
     if (!project) return res.status(404).send('Project not found');
 
     const { google } = await import('googleapis');
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+    const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+    const redirectUri = `${proto}://${req.get('host')}/api/auth/google/callback`;
 
     const oauth2Client = new google.auth.OAuth2(
       project.youtube_client_id.trim(),

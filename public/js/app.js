@@ -189,6 +189,8 @@ async function switchProject(projectId) {
     }
   }
 
+  updateRedirectUriDisplay();
+
   // Load this project's videos & schedules
   loadCurrentProjectVideos();
   loadCurrentProjectSchedules();
@@ -939,6 +941,22 @@ function updateSimModeUI(simMode) {
       simPill.title = 'সরাসরি লাইভ আপলোড মোড চালু! ক্লিক করলে টেস্ট মোডে ফিরে যাবে।';
       simPill.innerHTML = '<i class="fa-solid fa-signal text-red-400"></i><span>🔴 Live Publishing</span>';
     }
+  }
+}
+
+function copyRedirectUri() {
+  const uri = `${window.location.origin}/api/auth/google/callback`;
+  navigator.clipboard.writeText(uri).then(() => {
+    showToast('Redirect URI কপি করা হয়েছে! Google Cloud Console-এ পেস্ট করুন।', 'success');
+  }).catch(() => {
+    prompt('এই লিংকটি কপি করুন:', uri);
+  });
+}
+
+function updateRedirectUriDisplay() {
+  const el = document.getElementById('display-redirect-uri');
+  if (el) {
+    el.textContent = `${window.location.origin}/api/auth/google/callback`;
   }
 }
 

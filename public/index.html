@@ -524,8 +524,20 @@
                   <input type="password" id="setting-yt-client-secret" placeholder="GOCSPX-xxxx" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono">
                 </div>
                 <div>
-                  <label class="block text-[11px] text-slate-400 mb-1">OAuth Refresh Token</label>
-                  <input type="password" id="setting-yt-refresh-token" placeholder="1//04xxxx..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono">
+                  <label class="block text-[11px] text-slate-400 mb-1">OAuth Refresh Token (স্বয়ংক্রিয়ভাবে সেভ হবে)</label>
+                  <input type="password" id="setting-yt-refresh-token" placeholder="1//04xxxx... (1-Click কানেক্ট করলে একা একাই বসবে)" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono">
+                </div>
+
+                <!-- Redirect URI Copy Box -->
+                <div class="p-2.5 rounded-lg bg-indigo-950/40 border border-indigo-500/30 text-[11px] space-y-1.5">
+                  <div class="flex items-center justify-between text-indigo-300 font-semibold">
+                    <span>Google Cloud Console - Authorized Redirect URI:</span>
+                    <button type="button" onclick="copyRedirectUri()" class="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold transition flex items-center gap-1 cursor-pointer shadow">
+                      <i class="fa-regular fa-copy"></i>
+                      <span>কপি করুন</span>
+                    </button>
+                  </div>
+                  <code id="display-redirect-uri" class="block bg-slate-900 border border-slate-800 px-2 py-1 rounded text-indigo-200 font-mono text-[10px] break-all select-all">https://autoshorts-pdxj.onrender.com/api/auth/google/callback</code>
                 </div>
 
                 <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
