@@ -140,6 +140,65 @@ async function switchProject(projectId) {
     badgesContainer.innerHTML += `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600/20 text-blue-400 border border-blue-500/30"><i class="fa-brands fa-facebook mr-1"></i>Facebook Reels</span>`;
   }
 
+  // LocalStorage Auto-Backup and Restore (prevents losing credentials on server restart/redeploy)
+  const localBackupKey = `autoshorts_cred_backup_proj_${currentProjectId}`;
+  let backup = {};
+  try {
+    backup = JSON.parse(localStorage.getItem(localBackupKey) || '{}');
+  } catch(e) {}
+
+  let needsAutoSync = false;
+  if (!currentProject.youtube_client_id && backup.youtube_client_id) {
+    currentProject.youtube_client_id = backup.youtube_client_id;
+    needsAutoSync = true;
+  }
+  if (!currentProject.youtube_client_secret && backup.youtube_client_secret) {
+    currentProject.youtube_client_secret = backup.youtube_client_secret;
+    needsAutoSync = true;
+  }
+  if (!currentProject.youtube_refresh_token && backup.youtube_refresh_token) {
+    currentProject.youtube_refresh_token = backup.youtube_refresh_token;
+    needsAutoSync = true;
+  }
+  if (!currentProject.gdrive_folder_url && backup.gdrive_folder_url) {
+    currentProject.gdrive_folder_url = backup.gdrive_folder_url;
+    needsAutoSync = true;
+  }
+  if (!currentProject.facebook_access_token && backup.facebook_access_token) {
+    currentProject.facebook_access_token = backup.facebook_access_token;
+    needsAutoSync = true;
+  }
+  if (!currentProject.facebook_page_id && backup.facebook_page_id) {
+    currentProject.facebook_page_id = backup.facebook_page_id;
+    needsAutoSync = true;
+  }
+
+  // Update backup with latest values
+  localStorage.setItem(localBackupKey, JSON.stringify({
+    youtube_client_id: currentProject.youtube_client_id || backup.youtube_client_id || '',
+    youtube_client_secret: currentProject.youtube_client_secret || backup.youtube_client_secret || '',
+    youtube_refresh_token: currentProject.youtube_refresh_token || backup.youtube_refresh_token || '',
+    gdrive_folder_url: currentProject.gdrive_folder_url || backup.gdrive_folder_url || '',
+    facebook_access_token: currentProject.facebook_access_token || backup.facebook_access_token || '',
+    facebook_page_id: currentProject.facebook_page_id || backup.facebook_page_id || ''
+  }));
+
+  if (needsAutoSync) {
+    console.log('Auto-restoring credentials from browser storage to server...');
+    fetch(`/api/projects/${currentProjectId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        youtube_client_id: currentProject.youtube_client_id,
+        youtube_client_secret: currentProject.youtube_client_secret,
+        youtube_refresh_token: currentProject.youtube_refresh_token,
+        gdrive_folder_url: currentProject.gdrive_folder_url,
+        facebook_access_token: currentProject.facebook_access_token,
+        facebook_page_id: currentProject.facebook_page_id
+      })
+    }).catch(e => console.error('Failed to sync restored credentials:', e));
+  }
+
   // Populate Channel Settings Form
   document.getElementById('setting-wm-position').value = currentProject.watermark_position || 'top-right';
   document.getElementById('setting-wm-opacity').value = String(currentProject.watermark_opacity || 0.85);
@@ -790,6 +849,19 @@ async function saveProjectSettingsFull() {
     facebook_access_token: document.getElementById('setting-fb-token').value
   };
 
+  // Keep permanent backup in browser localStorage
+  try {
+    const localBackupKey = `autoshorts_cred_backup_proj_${currentProjectId}`;
+    localStorage.setItem(localBackupKey, JSON.stringify({
+      youtube_client_id: updated.youtube_client_id,
+      youtube_client_secret: updated.youtube_client_secret,
+      youtube_refresh_token: updated.youtube_refresh_token,
+      facebook_page_id: updated.facebook_page_id,
+      facebook_access_token: updated.facebook_access_token,
+      gdrive_folder_url: document.getElementById('project-gdrive-folder')?.value || ''
+    }));
+  } catch(e) {}
+
   try {
     const res = await fetch(`/api/projects/${currentProjectId}`, {
       method: 'PUT',
@@ -989,6 +1061,25 @@ function updateRedirectUriDisplay() {
     el.textContent = `${window.location.origin}/api/auth/google/callback`;
   }
 }
+
+// Capture OAuth Refresh Token directly into localStorage and settings
+window.addEventListener('message', async (event) => {
+  if (event.data && event.data.type === 'YOUTUBE_OAUTH_TOKEN' && event.data.refreshToken) {
+    const token = event.data.refreshToken;
+    const input = document.getElementById('setting-yt-refresh-token');
+    if (input) input.value = token;
+    try {
+      const localBackupKey = `autoshorts_cred_backup_proj_${currentProjectId}`;
+      const b = JSON.parse(localStorage.getItem(localBackupKey) || '{}');
+      b.youtube_refresh_token = token;
+      b.youtube_client_id = document.getElementById('setting-yt-client-id')?.value || b.youtube_client_id || '';
+      b.youtube_client_secret = document.getElementById('setting-yt-client-secret')?.value || b.youtube_client_secret || '';
+      localStorage.setItem(localBackupKey, JSON.stringify(b));
+    } catch(e) {}
+    await saveProjectSettingsFull();
+    testYouTubeConnection();
+  }
+});
 
 async function loginWithGoogleOAuth() {
   if (!currentProjectId) return;

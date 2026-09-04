@@ -770,6 +770,15 @@ app.get('/api/auth/google/callback', async (req, res) => {
           <button onclick="window.close(); if(window.opener) { window.opener.location.reload(); }">ড্যাশবোর্ডে ফিরে যান</button>
         </div>
         <script>
+          try {
+            if (window.opener) {
+              window.opener.postMessage({
+                type: 'YOUTUBE_OAUTH_TOKEN',
+                projectId: ${projectId},
+                refreshToken: '${tokens.refresh_token || ""}'
+              }, '*');
+            }
+          } catch(e) {}
           setTimeout(() => {
             if (window.opener) {
               window.opener.location.reload();
@@ -777,7 +786,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
             } else {
               window.location.href = '/';
             }
-          }, 2500);
+          }, 1800);
         </script>
       </body>
       </html>

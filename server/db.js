@@ -176,18 +176,38 @@ if (projectCount === 0) {
 
   const initialProjectId = initialProject.lastInsertRowid;
 
-  // Add default schedule slots for this project
+  // Add default schedule slots for this project (BD + USA 4x Daily Viral Preset)
   const insertSchedule = db.prepare(`
     INSERT INTO schedules (project_id, time_slot, is_enabled, label) VALUES (?, ?, ?, ?)
   `);
-  insertSchedule.run(initialProjectId, '09:00', 1, 'সকাল ৯টা (Morning)');
-  insertSchedule.run(initialProjectId, '14:00', 1, 'দুপুর ২টা (Noon)');
-  insertSchedule.run(initialProjectId, '17:00', 1, 'বিকাল ৫টা (Afternoon)');
-  insertSchedule.run(initialProjectId, '19:00', 1, 'সন্ধ্যা ৭টা (Evening)');
-  insertSchedule.run(initialProjectId, '21:00', 1, 'রাত ৯টা (Night)');
+  insertSchedule.run(initialProjectId, '09:00', 1, 'সকাল ০৯:০০ (BD Morning & US West Night)');
+  insertSchedule.run(initialProjectId, '14:00', 1, 'দুপুর ০২:০০ (BD Lunch & Afternoon Break)');
+  insertSchedule.run(initialProjectId, '19:00', 1, 'সন্ধ্যা ০৭:০০ (BD Evening & US East Morning)');
+  insertSchedule.run(initialProjectId, '23:00', 1, 'রাত ১১:০০ (BD Bedtime & US Midday Lunch)');
 
   // Update existing videos to belong to this project
   db.prepare(`UPDATE videos SET project_id = ? WHERE project_id IS NULL OR project_id = 0`).run(initialProjectId);
+}
+
+// Check environment variables for cloud persistence (e.g. on Render.com restarts)
+const envYtClientId = process.env.YOUTUBE_CLIENT_ID?.trim();
+const envYtClientSecret = process.env.YOUTUBE_CLIENT_SECRET?.trim();
+const envYtRefreshToken = process.env.YOUTUBE_REFRESH_TOKEN?.trim();
+const envGdriveUrl = process.env.GDRIVE_FOLDER_URL?.trim();
+
+if (envYtClientId || envYtClientSecret || envYtRefreshToken || envGdriveUrl) {
+  try {
+    const firstProj = db.prepare(`SELECT id FROM projects ORDER BY id ASC LIMIT 1`).get();
+    if (firstProj) {
+      if (envYtClientId) db.prepare(`UPDATE projects SET youtube_client_id = ? WHERE id = ?`).run(envYtClientId, firstProj.id);
+      if (envYtClientSecret) db.prepare(`UPDATE projects SET youtube_client_secret = ? WHERE id = ?`).run(envYtClientSecret, firstProj.id);
+      if (envYtRefreshToken) db.prepare(`UPDATE projects SET youtube_refresh_token = ? WHERE id = ?`).run(envYtRefreshToken, firstProj.id);
+      if (envGdriveUrl) db.prepare(`UPDATE projects SET gdrive_folder_url = ? WHERE id = ?`).run(envGdriveUrl, firstProj.id);
+      console.log('Seeded project credentials from environment variables successfully.');
+    }
+  } catch (err) {
+    console.error('Failed to seed credentials from env:', err.message);
+  }
 }
 
 export const getSettings = () => {
