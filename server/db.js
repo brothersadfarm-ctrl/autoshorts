@@ -198,8 +198,9 @@ const envYtClientId = process.env.YOUTUBE_CLIENT_ID?.trim();
 const envYtClientSecret = process.env.YOUTUBE_CLIENT_SECRET?.trim();
 const envYtRefreshToken = process.env.YOUTUBE_REFRESH_TOKEN?.trim();
 const envGdriveUrl = process.env.GDRIVE_FOLDER_URL?.trim();
-const envFbAccessToken = process.env.FACEBOOK_ACCESS_TOKEN?.trim();
-const envFbPageId = process.env.FACEBOOK_PAGE_ID?.trim();
+const defaultFbPermanentToken = 'EAAfDFlwYGwgBSRaWWZCgAw5sLy79aTaWqW8Oer0RDX5SozlY7BUyCijmY38eXhIMmq3sfaJKkZAwchwwuLNQtkT4QVTd6ZA5kUose5gBNBTc05qKnAZBuNM6iIUwRRxsuKn3RnToxL9nhBFj86doZBMGYyzmZAoyYLavbPnK5X7loknNTRgqceGKvwvixwnY7ZC8nsPkaEU';
+const envFbAccessToken = process.env.FACEBOOK_ACCESS_TOKEN?.trim() || defaultFbPermanentToken;
+const envFbPageId = process.env.FACEBOOK_PAGE_ID?.trim() || '1065568396646834';
 const envGeminiKey = process.env.GEMINI_API_KEY?.trim();
 
 try {
