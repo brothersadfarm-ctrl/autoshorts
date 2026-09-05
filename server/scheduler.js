@@ -244,8 +244,6 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
     db.prepare(`UPDATE videos SET status = 'processing', error_message = NULL WHERE id = ?`).run(video.id);
 
     // 1. Video & Audio Modification with FFmpeg using Project Logo
-    const processedFilename = `processed_${Date.now()}_${video.filename}`;
-    const processedPath = path.resolve(__dirname, '../uploads/processed', processedFilename);
 
     // Ensure watermark file exists on disk, or restore from database base64 / auto-fetch from channel avatar
     let watermarkPath = project.logo_path;
