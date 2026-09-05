@@ -1082,6 +1082,11 @@ app.delete('/api/logs', (req, res) => {
   res.json({ success: true });
 });
 
+// SPA Fallback for client-side navigation
+app.get('*', (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../public/index.html'));
+});
+
 // Start scheduler and web server
 startScheduler();
 
