@@ -227,17 +227,12 @@ try {
   const defaultGeminiKey = Buffer.from('QVEuQWI4Uk42STlFTjRzYUR4QjFDd3NlYkdPSTB5eXVtSzVRb3lCM0dORXVQNGFEM1VDMlE=', 'base64').toString('utf8');
   db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('gemini_api_key', ?)`).run(envGeminiKey || defaultGeminiKey);
 
-  // Clear any corrupted ai cat (155) runs from tracker so it can be re-published cleanly
-  try {
-    db.prepare(`DELETE FROM published_tracker WHERE project_id = 1 AND (gdrive_file_id = '1NYwDepa9nmsNKy1TsZuP33ukMOqSSimr' OR original_name = 'ai cat (155).mp4')`).run();
-    db.prepare(`DELETE FROM videos WHERE project_id = 1 AND (gdrive_file_id = '1NYwDepa9nmsNKy1TsZuP33ukMOqSSimr' OR original_name = 'ai cat (155).mp4')`).run();
-  } catch(e) {}
-
   // Seed previously published Google Drive IDs to permanently avoid duplicate uploads
   const seedPublishedIds = [
     { gdriveId: '1QjVX5Ol2_TH8dWnqdppX_y4u_MbEJhOt', name: 'ai cat (1).mp4' },
     { gdriveId: '1XJEdRqcAhnXD0qoN4AlocRzG9Q4vtgdT', name: 'ai cat (153).mp4' },
-    { gdriveId: '19IMMFPnq9RznYxdliVRQXhbZC4mejkWn', name: 'ai cat (154).mp4' }
+    { gdriveId: '19IMMFPnq9RznYxdliVRQXhbZC4mejkWn', name: 'ai cat (154).mp4' },
+    { gdriveId: '1NYwDepa9nmsNKy1TsZuP33ukMOqSSimr', name: 'ai cat (155).mp4' }
   ];
   for (const item of seedPublishedIds) {
     try {

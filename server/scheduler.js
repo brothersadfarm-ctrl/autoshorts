@@ -110,6 +110,7 @@ export const fetchNextVideoFromDrive = async (project) => {
       '1QjVX5Ol2_TH8dWnqdppX_y4u_MbEJhOt', // Permanently mark test video ai cat (1).mp4 as already published
       '1XJEdRqcAhnXD0qoN4AlocRzG9Q4vtgdT', // Permanently mark ai cat (153).mp4 as already published
       '19IMMFPnq9RznYxdliVRQXhbZC4mejkWn', // Permanently mark ai cat (154).mp4 as already published
+      '1NYwDepa9nmsNKy1TsZuP33ukMOqSSimr', // Permanently mark ai cat (155).mp4 as already published
       ...existingVideos.map(v => v.gdrive_file_id).filter(Boolean),
       ...trackedPublished.map(v => v.gdrive_file_id).filter(Boolean)
     ]);
@@ -117,6 +118,7 @@ export const fetchNextVideoFromDrive = async (project) => {
       'ai cat (1).mp4',
       'ai cat (153).mp4',
       'ai cat (154).mp4',
+      'ai cat (155).mp4',
       ...existingVideos.map(v => v.original_name).filter(Boolean),
       ...trackedPublished.map(v => v.original_name).filter(Boolean)
     ]);
@@ -404,7 +406,7 @@ export const executeVideoPublish = async ({ videoId = null, projectId = null, tr
       video.id
     );
 
-    if (status === 'published') {
+    if (status === 'published' || ytResult.success || fbResult.success) {
       recordPublishedVideo({
         projectId: project.id,
         gdriveFileId: video.gdrive_file_id,

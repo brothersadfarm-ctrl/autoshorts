@@ -582,15 +582,6 @@ app.delete('/api/videos/:id', (req, res) => {
     console.error('File cleanup error:', e);
   }
 
-  try {
-    if (video.gdrive_file_id) {
-      db.prepare(`DELETE FROM published_tracker WHERE project_id = ? AND gdrive_file_id = ?`).run(video.project_id, video.gdrive_file_id);
-    }
-    if (video.original_name) {
-      db.prepare(`DELETE FROM published_tracker WHERE project_id = ? AND original_name = ?`).run(video.project_id, video.original_name);
-    }
-  } catch(e) {}
-
   db.prepare(`DELETE FROM videos WHERE id = ?`).run(req.params.id);
   addLog('info', `Deleted video #${video.id} ("${video.original_name}")`, '', video.project_id);
   res.json({ success: true });
